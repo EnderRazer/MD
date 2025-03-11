@@ -1,0 +1,67 @@
+{
+    "settings" : {
+        "threads":16,
+        "debug" : true,
+        "profiling" : false,
+        "pbc" : true,
+        "start_temp": 2.7315,
+        "nsteps":10000000,
+        "delta_t":0.001                     
+    },
+    "dimensions":{
+        "crist_length" : 0.35196,
+        "crist_num_x":10,
+        "crist_num_y":10,
+        "crist_num_z":10
+    },
+    "material" : { 
+        "name" : "Nickel", 
+        "struct_type" : "GCC",
+        "mass" : 97.463
+    },
+    "potential" : {
+        "type" : "EAM", 
+        "params" : {
+            "r_e" : 0.2488746,
+            "f_e" : 2.007018,
+            "rho_e" : 27.562015,
+            "rho_s" : 27.93041,
+            "om_e" : -2.699486,
+            "om_n" : [ -2.693513, -0.076445, 0.241442, -2.375626 ],
+            "om" : [ -2.7, 0, 0.26539, -0.152856 ],
+            "alpha" : 8.383453,
+            "beta" : 4.471175,
+            "a" : 0.429046,
+            "b" : 0.633531,
+            "k" : 0.443599,
+            "lambda" : 0.820658,
+            "eta" : 0.469,
+            "m" : 20,
+            "n" : 20,
+            "energy_unit" : 160.218,
+            "r_cut" : 0.9
+        }
+    },
+    "backup" : {
+        "toggle" : true,
+        "restore_step" : 0,
+        "frequency":100
+    },
+    "macroparams" : {
+        "toggle" : false, 
+        "macroparam_type" : "GK"
+    },
+    "thermostat":{
+        "toggle":true,
+        "type":"LNGVN",
+        "pref_temp":2.7315,
+        "tau":1.0
+    },
+    "barostat":{
+        "toggle":true,
+        "type":"BRNDSN",
+        "pref_pressure":0.101325,
+        "tau":1.0
+    }
+    
+}
