@@ -195,6 +195,18 @@ public:
 
     return oss.str();
   }
+  std::string getShortData() const {
+    std::ostringstream oss;
+    oss.precision(16);
+    oss << "Current step: " << current_step_
+        << "\nMomentum:"
+        << "\n\tTemperature: " << temperature_ << "\n\tPressure: " << pressure_
+        << "\nAverage:"
+        << "\n\tTemperature: " << temperature_avg_ << "\n\tPressure: " << pressure_avg_
+        << "\n";
+
+    return oss.str();
+  }
   std::string getParticlesInfo() const {
     std::ostringstream oss;
     oss.precision(16);

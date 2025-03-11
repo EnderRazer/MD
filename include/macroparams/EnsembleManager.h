@@ -175,14 +175,11 @@ public:
       const int blockSize =
           ensemble_threads_num_ /
           threadPool_.getThreads(); // или любая удобная величина
-      std::cout << "Block size: " << blockSize << std::endl;
       std::vector<std::future<int>> futures;
 
       for (int start = 0; start < ensemble_threads_num_; start += blockSize) {
         int end = std::min(start + blockSize, ensemble_threads_num_);
         // enqueue задачу на вычисление для блока [start, end)
-        std::cout << "[Start,End]: [" << start << ", " << end << "]"
-                  << std::endl;
         futures.push_back(threadPool_.enqueue([this, &sys, start, end]() {
           int thread_finished_count = 0;
           for (int i = start; i < end; i++) {

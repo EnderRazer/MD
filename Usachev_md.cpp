@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
     completed = md.advanceStep(sys);
     step_timer.stop();
     cout << "Step " << i << " - done in " << step_timer.elapsed() << endl;
-    cout << sys.getData() << endl;
+    cout << sys.getShortData() << endl;
     cout << "Accumulated ensembles: " << ensembleManager.getCurrentEnsCount()
          << endl;
     if (completed)

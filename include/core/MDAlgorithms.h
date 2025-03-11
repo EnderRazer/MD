@@ -7,6 +7,7 @@
 
 class MDAlgorithms {
 private:
+  Timer timer_{1}; 
   Settings &settings_;
   ThreadPool &threadPool_;
   EnsembleManager &ensemble_manager_;
@@ -124,24 +125,45 @@ public:
   }
   bool advanceStep(System &sys_) {
     sys_.advanceStep();
+    //Термостат Ланжевена
     if (thermostat_ && thermostat_->getThermostatType() ==
                            Thermostat::ThermostatType::LANGEVIN) {
       std::cout << "Applying Langevin thermostat" << std::endl;
       thermostat_->applyTemperatureControl(sys_);
     }
+
     // Расчет первой половины скоростей
+    timer_.start();
     CalculateVelocities(sys_);
+    timer_.stop();
+    std::cout<<"Function `CalculateVelocities` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
+
     // Расчет новых координат
+    timer_.start();
     CalculateCoordinates(sys_);
+    timer_.stop();
+    std::cout<<"Function `CalculateCoordinates` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
+
+    //Баростат Берендсена
     if (barostat_ &&
         barostat_->getBarostatType() == Barostat::BarostatType::BERENDSEN) {
       std::cout << "Applying Berendsen thermostat" << std::endl;
       barostat_->applyPressureControl(sys_);
     }
+
     // Расчет сил
+    timer_.start();
     CalculateForces(sys_);
+    timer_.stop();
+    std::cout<<"Function `CalculateForces` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
+
     // Расчет второй половины скоростей
+    timer_.start();
     CalculateVelocities(sys_);
+    timer_.stop();
+    std::cout<<"Function `CalculateVelocities` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
+
+    //Термостат Берендсена
     if (thermostat_ && thermostat_->getThermostatType() ==
                            Thermostat::ThermostatType::BERENDSEN) {
       std::cout << "Applying Berendsen thermostat" << std::endl;
@@ -165,8 +187,11 @@ public:
     sys_.setPressure(macroparams_.getPressure(sys_));
     sys_.updatePressureAvg();
     // Транспортные коэффициенты
+    timer_.start();
     if (!ensemble_manager_.completed())
       ensemble_manager_.accumulateGreenCubo(sys_);
+    timer_.stop();
+    std::cout<<"Function `accumulateGreenCubo` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
     // Вывод в файл
     outputManager_.writeSystemProperties(sys_);
