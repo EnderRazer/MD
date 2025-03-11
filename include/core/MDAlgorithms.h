@@ -194,12 +194,23 @@ public:
     std::cout<<"Function `accumulateGreenCubo` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
     // Вывод в файл
+    timer_.start();
     outputManager_.writeSystemProperties(sys_);
+    timer_.stop();
+    std::cout<<"Function `writeSystemProperties` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
+    // Вывод в файлы ансамблей
+    timer_.start();
     outputManager_.writeEnsemblesDetailed(ensemble_manager_);
+    timer_.stop();
+    std::cout<<"Function `writeEnsemblesDetailed` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
+
+    // Вывод усредненных значений ансамблей
+    timer_.start();
     if (ensemble_manager_.completed()) {
       outputManager_.writeAvgEnsembleDetailed(ensemble_manager_);
       return true;
     }
+    std::cout<<"Function `writeAvgEnsembleDetailed` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     return false;
   }
 

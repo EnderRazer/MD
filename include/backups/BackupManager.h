@@ -21,7 +21,7 @@ public:
     std::cout << "Введите путь до файла бекапа: ";
     std::cin >> input;
     return readRecordsFromFile(
-        input + "/backup_" + std::to_string(backup_restore_step_) + ".bak",
+        input + "backup_" + std::to_string(backup_restore_step_) + ".bak",
         sys);
   };
 
