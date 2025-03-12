@@ -5,9 +5,10 @@
 #include "ForceAlgorithm.h"
 #include "VelocityAlgorithm.h"
 
-class MDAlgorithms {
+class MDAlgorithms
+{
 private:
-  Timer timer_{1}; 
+  Timer timer_{1};
   Settings &settings_;
   ThreadPool &threadPool_;
   EnsembleManager &ensemble_manager_;
@@ -23,7 +24,8 @@ private:
   Macroparams macroparams_;
 
 public:
-  void CalculateCoordinates(System &sys_) {
+  void CalculateCoordinates(System &sys_)
+  {
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
     Dimensions dim = sys_.dimensions();
@@ -31,24 +33,27 @@ public:
     const int blockSize =
         pn / settings_.threads(); // или любая удобная величина
     std::vector<std::future<void>> futures;
-    for (int start = 0; start < pn; start += blockSize) {
+    for (int start = 0; start < pn; start += blockSize)
+    {
       int end = std::min(start + blockSize, pn);
       // enqueue задачу на вычисление для блока [start, end)
       futures.push_back(
-          threadPool_.enqueue([this, &particles, &dim, start, end]() {
+          threadPool_.enqueue([this, &particles, &dim, start, end]()
+                              {
             for (int i = start; i < end; i++) {
               coords_.compute(particles[i]);
               if (settings_.hasPbc())
                 coords_.applyPBC(particles[i], dim);
-            }
-          }));
+            } }));
     }
     // Ждём завершения всех
-    for (auto &f : futures) {
+    for (auto &f : futures)
+    {
       f.get();
     }
   }
-  void CalculateVelocities(System &sys_) {
+  void CalculateVelocities(System &sys_)
+  {
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
 
@@ -56,21 +61,24 @@ public:
         pn / settings_.threads(); // или любая удобная величина
     std::vector<std::future<void>> futures;
 
-    for (int start = 0; start < pn; start += blockSize) {
+    for (int start = 0; start < pn; start += blockSize)
+    {
       int end = std::min(start + blockSize, pn);
       // enqueue задачу на вычисление для блока [start, end)
-      futures.push_back(threadPool_.enqueue([this, &particles, start, end]() {
+      futures.push_back(threadPool_.enqueue([this, &particles, start, end]()
+                                            {
         for (int i = start; i < end; i++) {
           vels_.compute(particles[i]);
-        }
-      }));
+        } }));
     }
     // Ждём завершения всех
-    for (auto &f : futures) {
+    for (auto &f : futures)
+    {
       f.get();
     }
   }
-  void CalculateForces(System &sys_) {
+  void CalculateForces(System &sys_)
+  {
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
 
@@ -78,11 +86,13 @@ public:
         pn / settings_.threads(); // или любая удобная величина
     std::vector<std::future<void>> futures;
 
-    for (int start = 0; start < pn; start += blockSize) {
+    for (int start = 0; start < pn; start += blockSize)
+    {
       int end = std::min(start + blockSize, pn);
       // enqueue задачу на вычисление для блока [start, end)
       futures.push_back(
-          threadPool_.enqueue([this, &pn, &particles, start, end]() {
+          threadPool_.enqueue([this, &pn, &particles, start, end]()
+                              {
             for (int i = start; i < end; i++) {
               ForceCalcValues result_interaction_i;
               ForceCalcValues interaction_ij;
@@ -95,16 +105,17 @@ public:
                 result_interaction_i.virials += interaction_ij.virials;
               }
               particles[i].applyForceInteraction(result_interaction_i);
-            }
-          }));
+            } }));
     }
     // Ждём завершения всех
-    for (auto &f : futures) {
+    for (auto &f : futures)
+    {
       f.get();
     }
   }
 
-  void initialStep(System &sys_) {
+  void initialStep(System &sys_)
+  {
     backupManager_.createBackup(sys_);
     // Расчет сил
     CalculateForces(sys_);
@@ -123,56 +134,48 @@ public:
     outputManager_.writeStepData(sys_);
     outputManager_.writeEnsemblesDetailed(ensemble_manager_);
   }
-  bool advanceStep(System &sys_) {
+  bool advanceStep(System &sys_)
+  {
     sys_.advanceStep();
-    //Термостат Ланжевена
+    // Термостат Ланжевена
     if (thermostat_ && thermostat_->getThermostatType() ==
-                           Thermostat::ThermostatType::LANGEVIN) {
+                           Thermostat::ThermostatType::LANGEVIN)
+    {
       std::cout << "Applying Langevin thermostat" << std::endl;
       thermostat_->applyTemperatureControl(sys_);
     }
 
     // Расчет первой половины скоростей
-    timer_.start();
     CalculateVelocities(sys_);
-    timer_.stop();
-    std::cout<<"Function `CalculateVelocities` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
     // Расчет новых координат
-    timer_.start();
     CalculateCoordinates(sys_);
-    timer_.stop();
-    std::cout<<"Function `CalculateCoordinates` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
-    //Баростат Берендсена
+    // Баростат Берендсена
     if (barostat_ &&
-        barostat_->getBarostatType() == Barostat::BarostatType::BERENDSEN) {
+        barostat_->getBarostatType() == Barostat::BarostatType::BERENDSEN)
+    {
       std::cout << "Applying Berendsen thermostat" << std::endl;
       barostat_->applyPressureControl(sys_);
     }
 
     // Расчет сил
-    timer_.start();
     CalculateForces(sys_);
-    timer_.stop();
-    std::cout<<"Function `CalculateForces` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
-    // Расчет второй половины скоростей
-    timer_.start();
+    // Расчет второй половины скоростейa
     CalculateVelocities(sys_);
-    timer_.stop();
-    std::cout<<"Function `CalculateVelocities` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
-    //Термостат Берендсена
+    // Термостат Берендсена
     if (thermostat_ && thermostat_->getThermostatType() ==
-                           Thermostat::ThermostatType::BERENDSEN) {
+                           Thermostat::ThermostatType::BERENDSEN)
+    {
       std::cout << "Applying Berendsen thermostat" << std::endl;
       thermostat_->applyTemperatureControl(sys_);
     }
     // Делаем бекап после расчета основных параметров
-    if (sys_.currentStep() % backupManager_.frequency() == 0) {
+    if (sys_.currentStep() % backupManager_.frequency() == 0)
+    {
       backupManager_.createBackup(sys_);
-      outputManager_.writeStepData(sys_);
     }
     // Обновление центра масс
     sys_.updateVCM();
@@ -187,30 +190,27 @@ public:
     sys_.setPressure(macroparams_.getPressure(sys_));
     sys_.updatePressureAvg();
     // Транспортные коэффициенты
-    timer_.start();
+
     if (!ensemble_manager_.completed())
       ensemble_manager_.accumulateGreenCubo(sys_);
-    timer_.stop();
-    std::cout<<"Function `accumulateGreenCubo` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
-    // Вывод в файл
-    timer_.start();
-    outputManager_.writeSystemProperties(sys_);
-    timer_.stop();
-    std::cout<<"Function `writeSystemProperties` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
-    // Вывод в файлы ансамблей
-    timer_.start();
-    outputManager_.writeEnsemblesDetailed(ensemble_manager_);
-    timer_.stop();
-    std::cout<<"Function `writeEnsemblesDetailed` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
+    if (sys_.currentStep() % outputManager_.frequency() == 0)
+    {
 
-    // Вывод усредненных значений ансамблей
-    timer_.start();
-    if (ensemble_manager_.completed()) {
-      outputManager_.writeAvgEnsembleDetailed(ensemble_manager_);
-      return true;
+      // Вывод в файл
+      outputManager_.writeSystemProperties(sys_);
+
+      // Вывод в файлы ансамблей
+      outputManager_.writeEnsemblesDetailed(ensemble_manager_);
+
+      outputManager_.writeStepData(sys_);
+      // Вывод усредненных значений ансамблей
+      if (ensemble_manager_.completed())
+      {
+        outputManager_.writeAvgEnsembleDetailed(ensemble_manager_);
+        return true;
+      }
     }
-    std::cout<<"Function `writeAvgEnsembleDetailed` elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     return false;
   }
 

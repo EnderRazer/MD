@@ -4,33 +4,43 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-class OutputManager {
+class OutputManager
+{
 private:
   std::string output_dir_;
   std::string step_dir_;
   std::string ens_dir_;
 
+  int frequency_;
+
 public:
-  OutputManager(const std::string &output_dir, Settings &settings)
-      : output_dir_(output_dir + "_" + std::to_string(settings.seed())) {
-    if (!fs::exists(output_dir_)) {
+  OutputManager(const json &config, Settings &settings)
+  {
+    output_dir_ = config.value("main_directory", "data");
+    if (!fs::exists(output_dir_))
+    {
       fs::create_directory(output_dir_);
     }
-    step_dir_ = output_dir_ + "/steps";
-    if (!fs::exists(step_dir_)) {
+    step_dir_ = output_dir_ + "/" + config.value("steps_directory", "steps_data");
+    if (!fs::exists(step_dir_))
+    {
       fs::create_directory(step_dir_);
     }
-    ens_dir_ = output_dir_ + "/ensembles";
-    if (!fs::exists(ens_dir_)) {
+    ens_dir_ = output_dir_ + "/" + config.value("ensembles_directory", "ensembles_data");
+    if (!fs::exists(ens_dir_))
+    {
       fs::create_directory(ens_dir_);
     }
+    frequency_ = config.value("frequency", 1);
   }
 
   // Запрещаем копирование
   OutputManager(const OutputManager &) = delete;
   OutputManager &operator=(const OutputManager &) = delete;
 
-  void writeModellingProperties(json &config) const {
+  inline const int frequency() const { return frequency_; }
+  void writeModellingProperties(json &config) const
+  {
     std::string filename = output_dir_ + "/launch_config.json";
     std::ofstream file(filename, std::ios::app);
     file << config.dump(4) << std::endl;
@@ -38,94 +48,89 @@ public:
   }
   // Write accumulated properties (temperature, pressure, energies, pulse) over
   // steps
-  void writeSystemProperties(System &sys) const {
-    std::string filename = output_dir_ + "/properties.dat";
+  void writeSystemProperties(System &sys) const
+  {
+    std::string filename = output_dir_ + "/properties.csv";
     bool file_exists = fs::exists(filename);
 
     std::ofstream file(filename, std::ios::app);
     file << std::fixed
          << std::setprecision(16); // Fixed-point notation with high precision
-    // Define column width
-    constexpr int width = 24;
-    constexpr int id_width = 8;
+
     // Write header if file does not exist
-    if (!file_exists) {
-      file << std::setw(id_width) << "Step" << std::setw(width) << "Temperature"
-           << std::setw(width) << "Pressure" << std::setw(width) << "TempAvg"
-           << std::setw(width) << "PressAvg" << std::setw(width) << "KineticE"
-           << std::setw(width) << "PotentialE" << std::setw(width) << "TotalE"
-           << std::setw(width) << "Pulse"
+    if (!file_exists)
+    {
+      file << "Step;" << "Temperature;"
+           << "Pressure;" << "TempAvg;"
+           << "PressAvg;" << "KineticE;"
+           << "PotentialE;" << "TotalE;"
+           << "Pulse;"
            << "\n";
     }
     // Write formatted data
-    file << std::setw(id_width) << sys.currentStep() << std::setw(width)
-         << sys.temperature() << std::setw(width) << sys.pressure()
-         << std::setw(width) << sys.temperatureAvg() << std::setw(width)
-         << sys.pressureAvg() << std::setw(width)
-         << sys.energies().get(Energy::EnergyType::Kinetic) << std::setw(width)
-         << sys.energies().get(Energy::EnergyType::Potential)
-         << std::setw(width) << sys.energies().get(Energy::EnergyType::Full)
-         << std::setw(width) << sys.pulse() << "\n";
+    file << sys.currentStep() << ";"
+         << sys.temperature() << ";"
+         << sys.pressure() << ";"
+         << sys.temperatureAvg() << ";"
+         << sys.pressureAvg() << ";"
+         << sys.energies().get(Energy::EnergyType::Kinetic) << ";"
+         << sys.energies().get(Energy::EnergyType::Potential) << ";"
+         << sys.energies().get(Energy::EnergyType::Full) << ";"
+         << sys.pulse() << ";"
+         << "\n";
     file.close();
   }
 
   // Create a directory for each step and write particle data
-  void writeStepData(System &sys) const {
+  void writeStepData(System &sys) const
+  {
     writeParticlesDetailed(sys, step_dir_ + "/step_" +
                                     std::to_string(sys.currentStep()) +
-                                    "_particles.dat");
+                                    "_particles.csv");
   }
 
-  void writeEnsemblesDetailed(const EnsembleManager &manager) const {
+  void writeEnsemblesDetailed(const EnsembleManager &manager) const
+  {
     std::vector<Ensemble> ensembles = manager.getEnsembles();
 
-    for (int i = 0; i < ensembles.size(); i++) {
-      if (ensembles[i].cur_ - 1 < 0)
-        return;
+    for (Ensemble &ens : ensembles)
+    {
+      if (ens.cur_ - 1 < 0)
+        continue;
       std::string filename =
-          ens_dir_ + "/ensemble_" + std::to_string(ensembles[i].id_);
+          ens_dir_ + "/ensemble_" + std::to_string(ens.id_) + ".csv";
       bool file_exists = fs::exists(filename);
       std::ofstream file(filename, std::ios::app);
       file << std::fixed
            << std::setprecision(16); // Fixed-point notation with high precision
-      // Define column width
-      constexpr int width = 24;
-      constexpr int id_width = 6;
 
       // Header
       if (!file_exists)
-        file << std::setw(id_width) << "n" << std::setw(width) << "ACFV"
-             << std::setw(width) << "CDiff" << std::setw(width) << "ACFP"
-             << std::setw(width) << "CVisc"
-             << "\n";
+        file << "n;" << "ACFV;" << "CDiff;" << "ACFP;" << "CVisc;" << "\n";
 
-      file << std::setw(id_width) << ensembles[i].cur_ - 1 << std::setw(width)
-           << ensembles[i].accum_acfv_[ensembles[i].cur_ - 1]
-           << std::setw(width)
-           << ensembles[i].coef_diff_integral_[ensembles[i].cur_ - 1]
-           << std::setw(width)
-           << ensembles[i].accum_acfp_[ensembles[i].cur_ - 1]
-           << std::setw(width)
-           << ensembles[i].coef_visc_integral_[ensembles[i].cur_ - 1] << "\n";
+      file << ens.cur_ - 1 << ";"
+           << ens.accum_acfv_[ens.cur_ - 1] << ";"
+           << ens.coef_diff_integral_[ens.cur_ - 1] << ";"
+           << ens.accum_acfp_[ens.cur_ - 1] << ";"
+           << ens.coef_visc_integral_[ens.cur_ - 1] << ";"
+           << "\n";
       file.close();
     }
   }
 
-  void writeAvgEnsembleDetailed(const EnsembleManager &manager) const {
-    std::string filename = ens_dir_ + "/ensemble_avg";
+  void writeAvgEnsembleDetailed(const EnsembleManager &manager) const
+  {
+    std::string filename = ens_dir_ + "/ensemble_avg.csv";
     bool file_exists = fs::exists(filename);
     std::ofstream file(filename);
     file << std::fixed
          << std::setprecision(16); // Fixed-point notation with high precision
-    // Define column width
-    constexpr int width = 24;
-    constexpr int id_width = 6;
 
     // Header
     if (!file_exists)
-      file << std::setw(id_width) << "n" << std::setw(width) << "ACFV"
-           << std::setw(width) << "CDiff" << std::setw(width) << "ACFP"
-           << std::setw(width) << "CVisc"
+      file << "n;" << "ACFV;"
+           << "CDiff;" << "ACFP;"
+           << "CVisc;"
            << "\n";
 
     std::vector<double> ensembles_accum_acfv_ = manager.getEnsemblesAccumAcfv();
@@ -136,17 +141,20 @@ public:
     std::vector<double> ensembles_coef_visc_integral_ =
         manager.getEnsemblesCoefViscIntegral();
 
-    for (int i = 0; i < manager.getEnsembleSize(); i++) {
-      file << std::setw(id_width) << i << std::setw(width)
-           << ensembles_accum_acfv_[i] << std::setw(width)
-           << ensembles_coef_diff_integral_[i] << std::setw(width)
-           << ensembles_accum_acfp_[i] << std::setw(width)
-           << ensembles_coef_visc_integral_[i] << "\n";
+    for (int i = 0; i < manager.getEnsembleSize(); i++)
+    {
+      file << i << ";"
+           << ensembles_accum_acfv_[i] << ";"
+           << ensembles_coef_diff_integral_[i] << ";"
+           << ensembles_accum_acfp_[i] << ";"
+           << ensembles_coef_visc_integral_[i] << ";"
+           << "\n";
     }
     file.close();
   }
 
-  const std::string getData() const {
+  const std::string getData() const
+  {
     std::ostringstream oss;
     oss << "Output manager data:" << "\n\tMain directory: " << output_dir_
         << "\n\tSteps directory" << step_dir_
@@ -155,38 +163,40 @@ public:
   }
 
 private:
-  void writeParticlesDetailed(System &sys, const std::string &filename) const {
+  void writeParticlesDetailed(System &sys, const std::string &filename) const
+  {
     std::ofstream file(filename);
     file << std::fixed
          << std::setprecision(16); // Fixed-point notation with high precision
-    // Define column width
-    constexpr int width = 24;
-    constexpr int id_width = 6;
 
     // Header
-    file << std::setw(id_width) << "n" << std::setw(width) << "Cx"
-         << std::setw(width) << "Cy" << std::setw(width) << "Cz"
-         << std::setw(width) << "Vx" << std::setw(width) << "Vy"
-         << std::setw(width) << "Vz" << std::setw(width) << "Fx"
-         << std::setw(width) << "Fy" << std::setw(width) << "Fz"
-         << std::setw(width) << "PotentialE" << std::setw(width) << "KineticE"
-         << std::setw(width) << "TotalE"
+    file << "n;"
+         << "Cx;" << "Cy;" << "Cz;"
+         << "Vx;" << "Vy;" << "Vz;"
+         << "Fx;" << "Fy;" << "Fz;"
+         << "PotentialE;" << "KineticE;" << "TotalE;"
          << "\n";
     int id = 0;
-    for (const auto &particle : sys.particles()) {
+    for (const auto &particle : sys.particles())
+    {
       const auto &coord = particle.coord();
       const auto &velocity = particle.velocity();
       const auto &force = particle.force();
       const auto &energies = particle.energies();
-      file << std::setw(id_width) << id++ << std::setw(width) << coord.x()
-           << std::setw(width) << coord.y() << std::setw(width) << coord.z()
-           << std::setw(width) << velocity.x() << std::setw(width)
-           << velocity.y() << std::setw(width) << velocity.z()
-           << std::setw(width) << force.x() << std::setw(width) << force.y()
-           << std::setw(width) << force.z() << std::setw(width)
-           << energies.get(Energy::EnergyType::Potential) << std::setw(width)
-           << energies.get(Energy::EnergyType::Kinetic) << std::setw(width)
-           << energies.get(Energy::EnergyType::Full) << "\n";
+      file << id++ << ";"
+           << coord.x() << ";"
+           << coord.y() << ";"
+           << coord.z() << ";"
+           << velocity.x() << ";"
+           << velocity.y() << ";"
+           << velocity.z() << ";"
+           << force.x() << ";"
+           << force.y() << ";"
+           << force.z() << ";"
+           << energies.get(Energy::EnergyType::Potential) << ";"
+           << energies.get(Energy::EnergyType::Kinetic) << ";"
+           << energies.get(Energy::EnergyType::Full) << ";"
+           << "\n";
     }
     file.close();
   }

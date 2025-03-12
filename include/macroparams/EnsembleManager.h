@@ -65,7 +65,7 @@ private:
                            System &sys) {
     // Если не успеваем рассчитать полный ансамбль, то и не считаем, чтобы не
     // забирать ресурсы
-    ens.id_ += thread_finished_count + ensemble_threads_num_;
+    ens.id_ += thread_finished_count + current_ens_count;
     if (sys.currentStep() + ensemble_size_ > nsteps_) {
       ens.cur_ = -INT32_MAX; // Просто очень большое отрицательное число до
                              // которого не дойдем
