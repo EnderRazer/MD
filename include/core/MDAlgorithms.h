@@ -159,10 +159,14 @@ public:
       barostat_->applyPressureControl(sys_);
     }
 
+    timer_.start();
     // Расчет сил
     CalculateForces(sys_);
+    timer_.stop();
+    std::cout << "Force calc time: " << timer_.elapsed() << std::endl;
+    force_avg_time += timer_.elapsed();
 
-    // Расчет второй половины скоростейa
+    // Расчет второй половины скоростей
     CalculateVelocities(sys_);
 
     // Термостат Берендсена
@@ -190,25 +194,29 @@ public:
     sys_.setPressure(macroparams_.getPressure(sys_));
     sys_.updatePressureAvg();
     // Транспортные коэффициенты
-
-    if (!ensemble_manager_.completed())
-      ensemble_manager_.accumulateGreenCubo(sys_);
+    if (macroparams_.enabled())
+    {
+      if (!ensemble_manager_.completed() && ensemble_manager_.enabled())
+        ensemble_manager_.accumulateGreenCubo(sys_);
+    }
 
     if (sys_.currentStep() % outputManager_.frequency() == 0)
     {
 
       // Вывод в файл
       outputManager_.writeSystemProperties(sys_);
-
-      // Вывод в файлы ансамблей
-      outputManager_.writeEnsemblesDetailed(ensemble_manager_);
-
       outputManager_.writeStepData(sys_);
-      // Вывод усредненных значений ансамблей
-      if (ensemble_manager_.completed())
+      if (macroparams_.enabled() && ensemble_manager_.enabled())
       {
-        outputManager_.writeAvgEnsembleDetailed(ensemble_manager_);
-        return true;
+        // Вывод в файлы ансамблей
+        outputManager_.writeEnsemblesDetailed(ensemble_manager_);
+
+        // Вывод усредненных значений ансамблей
+        if (ensemble_manager_.completed())
+        {
+          outputManager_.writeAvgEnsembleDetailed(ensemble_manager_);
+          return true;
+        }
       }
     }
     return false;

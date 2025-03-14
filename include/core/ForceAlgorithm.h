@@ -1,7 +1,8 @@
 #ifndef FORCE_ALGORITHM_H
 #define FORCE_ALGORITHM_H
 
-class ForceAlgorithm {
+class ForceAlgorithm
+{
 private:
   Settings &settings_;
   Dimensions dim_;
@@ -12,7 +13,8 @@ private:
   std::vector<double> mu_;
 
   inline Vector3<double> mirror_vector(Vector3<double> &vec, double lx,
-                                       double ly, double lz) {
+                                       double ly, double lz)
+  {
     double halfLX = lx / 2;
     double halfLY = ly / 2;
     double halfLZ = lz / 2;
@@ -35,12 +37,14 @@ private:
   }
 
 public:
-  inline ForceCalcValues compute(Particle &p1, Particle &p2) {
+  inline ForceCalcValues compute(Particle &p1, Particle &p2)
+  {
     ForceCalcValues output;
     Vector3<double> rVec = p1.coord() - p2.coord();
     output.rVec = rVec;
     // Отражение частицы
-    if (settings_.hasPbc()) {
+    if (settings_.hasPbc())
+    {
       double lx = dim_.lx();
       double ly = dim_.ly();
       double lz = dim_.lz();
@@ -54,17 +58,28 @@ public:
     // Расчет силы
     double U = 0.0;
     double FU = 0.0;
-    switch (potential_->getPotentialType()) {
+    switch (potential_->getPotentialType())
+    {
     case Potential::PotentialType::LJ:
+    {
+      // LJResult res = potential_->getAll(lengthSqr);
+      U = potential_->getU(lengthSqr);
+      FU = potential_->getFU(lengthSqr);
+      // U = res.u;
+      // FU = res.fu;
+      break;
+    }
+    case Potential::PotentialType::EAM:
+    {
       U = potential_->getU(lengthSqr);
       FU = potential_->getFU(lengthSqr);
       break;
-    case Potential::PotentialType::EAM:
-      U = potential_->getU(lengthSqr);
-      FU = potential_->getFU(lengthSqr);
+    }
     default:
+    {
       std::cout << "Unknown type of potential" << std::endl;
       break;
+    }
     }
     output.e_pot = U / 2;
     output.force = rVec * FU / lengthSqr;

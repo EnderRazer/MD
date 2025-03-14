@@ -3,21 +3,27 @@
 
 #include "EnsembleManager.h"
 
-class Macroparams {
+class Macroparams
+{
 private:
   Settings &settings_;
   const double T_CONST;
+  bool toggle_{false};
 
 public:
-  inline double getTemperature(System &sys) const {
+  inline const bool enabled() const { return toggle_; }
+  inline double getTemperature(System &sys) const
+  {
     return sys.energies().get(Energy::EnergyType::Thermodynamic) * T_CONST;
   }
 
-  inline double getPressure(System &sys) const {
+  inline double getPressure(System &sys) const
+  {
     Matrix3 sumMV{};
     Matrix3 sumVirials{};
 
-    for (Particle &p : sys.particles()) {
+    for (Particle &p : sys.particles())
+    {
       sumMV.xx() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
                     (p.velocity().x() - sys.vcm().x()); // xx
       sumMV.xy() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
@@ -59,7 +65,7 @@ public:
   }
 
   Macroparams(json &config, Settings &settings)
-      : settings_(settings),
+      : settings_(settings), toggle_(config.value("toggle", false)),
         T_CONST((2 / (settings_.constants().D *
                       settings_.constants().KBOLTZMAN))) {};
 

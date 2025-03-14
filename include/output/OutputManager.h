@@ -16,7 +16,7 @@ private:
 public:
   OutputManager(const json &config, Settings &settings)
   {
-    output_dir_ = config.value("main_directory", "data");
+    output_dir_ = config.value("main_directory", "data") + "_" + std::to_string(settings.seed());
     if (!fs::exists(output_dir_))
     {
       fs::create_directory(output_dir_);
@@ -39,6 +39,7 @@ public:
   OutputManager &operator=(const OutputManager &) = delete;
 
   inline const int frequency() const { return frequency_; }
+
   void writeModellingProperties(json &config) const
   {
     std::string filename = output_dir_ + "/launch_config.json";

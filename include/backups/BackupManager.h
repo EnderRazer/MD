@@ -3,20 +3,23 @@
 #include <filesystem>
 using json = nlohmann::json;
 // The BackupManager class handles saving/restoring these Records
-class BackupManager {
+class BackupManager
+{
 public:
   inline bool enabled() const { return toggle_; }
   inline int frequency() const { return backup_frequency_; }
   // Write backup data to file
   // Returns true on success, false on failure
-  bool createBackup(System &sys) const {
+  bool createBackup(System &sys) const
+  {
     std::ostringstream oss;
     oss << base_folder_ << "/" << "backup_" << sys.currentStep() << ".bak";
     return writeRecordsToFile(oss.str(), sys);
   }
   // Restore data from backup file
   // Returns true on success, false on failure
-  bool restoreBackup(System &sys) {
+  bool restoreBackup(System &sys)
+  {
     std::string input;
     std::cout << "Введите путь до файла бекапа: ";
     std::cin >> input;
@@ -25,7 +28,8 @@ public:
         sys);
   };
 
-  std::string getData() const {
+  std::string getData() const
+  {
     std::ostringstream oss;
     oss << "Backupdata" << "\n\tBackup enabled: " << toggle_
         << "\n\tBackup restore step: " << backup_restore_step_
@@ -33,10 +37,13 @@ public:
     return oss.str();
   }
 
-  BackupManager(json config, Settings &settings) {
+  BackupManager(json config, Settings &settings)
+  {
     base_folder_ = "data_" + std::to_string(settings.seed()) + "/backups";
-    if (!std::filesystem::exists(base_folder_)) {
-      if (!std::filesystem::create_directories(base_folder_)) {
+    if (!std::filesystem::exists(base_folder_))
+    {
+      if (!std::filesystem::create_directories(base_folder_))
+      {
         std::cerr << "Failed to create backup directory: " << base_folder_
                   << std::endl;
       }
@@ -53,10 +60,12 @@ private:
   int backup_frequency_{100};
   int backup_restore_step_{0};
   // Helper to write records in binary
-  bool writeRecordsToFile(const std::string &filename, System &sys) const {
+  bool writeRecordsToFile(const std::string &filename, System &sys) const
+  {
     // Open file in binary mode, std::ios::out ensures we overwrite
     std::ofstream outFile(filename, std::ios::binary | std::ios::out);
-    if (!outFile.is_open()) {
+    if (!outFile.is_open())
+    {
       std::cerr << "Could not open file for writing: " << filename << std::endl;
       return false;
     }
@@ -75,7 +84,8 @@ private:
     // Write each record in binary
     // NOTE: This assumes 'Record' is trivially copyable (POD).
     // If not, you'd serialize field by field.
-    for (const Particle &p : sys.particles()) {
+    for (const Particle &p : sys.particles())
+    {
       double mass = p.getMass();
       outFile.write(reinterpret_cast<const char *>(&mass), sizeof(double));
       outFile.write(reinterpret_cast<const char *>(&p.coord()),
@@ -89,9 +99,11 @@ private:
   }
 
   // Helper to read records in binary
-  bool readRecordsFromFile(const std::string &filename, System &sys) {
+  bool readRecordsFromFile(const std::string &filename, System &sys)
+  {
     std::ifstream inFile(filename, std::ios::binary | std::ios::in);
-    if (!inFile.is_open()) {
+    if (!inFile.is_open())
+    {
       throw std::invalid_argument("Could not open file for reading");
       return false;
     }
@@ -99,7 +111,8 @@ private:
     // Read and validate magic number
     uint32_t magicNumber;
     inFile.read(reinterpret_cast<char *>(&magicNumber), sizeof(magicNumber));
-    if (magicNumber != backup_restore_step_) {
+    if (magicNumber != backup_restore_step_)
+    {
       std::cerr << "Invalid backup file (bad restore step)." << std::endl;
       return false;
     }
@@ -111,7 +124,8 @@ private:
     sys.particles().clear();
     sys.particles().reserve(recordCount);
     // Read in each Record
-    for (size_t i = 0; i < recordCount; ++i) {
+    for (size_t i = 0; i < recordCount; ++i)
+    {
       double mass;
       Vector3<double> coord;
       Vector3<double> velocity;

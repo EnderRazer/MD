@@ -3,7 +3,8 @@
 
 using json = nlohmann::json;
 // EAM
-class EAM : public Potential {
+class EAM : public Potential
+{
 private:
   const PotentialType type_{PotentialType::EAM};
 
@@ -29,13 +30,15 @@ private:
   const double r_cut_;
   const double r_cut_sqr_;
 
-  inline double rho_f(double r) const {
+  inline double rho_f(double r) const
+  {
     double r_over_R_e = r / r_e_;
     double exp_term = exp(-beta_ * (r_over_R_e - 1));
     double pow_term = pow(r_over_R_e - lambda_, n_);
     return (f_e_ * exp_term) / (1 + pow_term);
   }
-  inline double d_rho_f(double r) const {
+  inline double d_rho_f(double r) const
+  {
     double r_over_Re = r / r_e_;
     double exp_term = exp(-beta_ * (r_over_Re - 1));
     double pow_term = pow(r_over_Re - lambda_, n_);
@@ -45,7 +48,8 @@ private:
     return f_e_ * (var1 - var2) / (var3 * var3);
   }
 
-  inline double mu(double r) const {
+  inline double mu(double r) const
+  {
     double r_over_Re = r / r_e_;
     double exp_term1 = exp(-alpha_ * (r_over_Re - 1));
     double pow_term1 = pow(r_over_Re - k_, m_);
@@ -55,7 +59,8 @@ private:
     return (a_ * exp_term1 / (1 + pow_term1)) -
            (b_ * exp_term2 / (1 + pow_term2));
   }
-  inline double d_mu(double r) const {
+  inline double d_mu(double r) const
+  {
     double r_over_Re = r / r_e_;
     double exp_term1 = exp(-alpha_ * (r_over_Re - 1));
     double pow_term1 = pow(r_over_Re - k_, m_);
@@ -73,24 +78,28 @@ private:
     return var1 + var2;
   }
 
-  inline double om1(double rho) const {
+  inline double om1(double rho) const
+  {
     double om_sum = 0;
     double rho_over_RHO_n = rho / rho_n_ - 1;
     double rho_pow = 1;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
       om_sum += om_n_[i] * rho_pow;
       rho_pow *= rho_over_RHO_n;
     }
 
     return om_sum;
   }
-  inline double d_om1(double rho) const {
+  inline double d_om1(double rho) const
+  {
     double d_om_sum = 0;
     double rho_over_RHO_n = rho / rho_n_ - 1;
     double rho_pow = 1;
 
-    for (int i = 1; i < 4; i++) {
+    for (int i = 1; i < 4; i++)
+    {
       d_om_sum += i * om_n_[i] * rho_pow / rho_n_;
       rho_pow *= rho_over_RHO_n;
     }
@@ -98,24 +107,28 @@ private:
     return d_om_sum;
   }
 
-  inline double om2(double rho) const {
+  inline double om2(double rho) const
+  {
     double om_sum = 0;
     double rho_over_RHO_e = rho / rho_e_ - 1;
     double rho_pow = 1;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
       om_sum += om_[i] * rho_pow;
       rho_pow *= rho_over_RHO_e;
     }
 
     return om_sum;
   }
-  inline double d_om2(double rho) const {
+  inline double d_om2(double rho) const
+  {
     double d_om_sum = 0;
     double rho_over_RHO_e = rho / rho_e_ - 1;
     double rho_pow = 1;
 
-    for (int i = 1; i < 4; i++) {
+    for (int i = 1; i < 4; i++)
+    {
       d_om_sum += i * om_[i] * rho_pow / rho_e_;
       rho_pow *= rho_over_RHO_e;
     }
@@ -123,14 +136,16 @@ private:
     return d_om_sum;
   }
 
-  inline double om3(double rho) const {
+  inline double om3(double rho) const
+  {
     double rho_over_RHO_s = rho / rho_s_;
     double pow_term = pow(rho_over_RHO_s, eta_);
     double log_term = log(pow_term);
 
     return om_e_ * (1 - log_term) * pow_term;
   }
-  inline double d_om3(double rho) const {
+  inline double d_om3(double rho) const
+  {
     double rho_over_RHO_s = rho / rho_s_;
     double pow_term = pow(rho_over_RHO_s, eta_);
     double log_term = log(pow_term);
@@ -138,20 +153,26 @@ private:
     return -om_e_ * eta_ * pow(rho_over_RHO_s, eta_ - 1) * log_term / rho_s_;
   }
 
-  inline double om(double rho) const {
-    if (rho < rho_n_) {
+  inline double om(double rho) const
+  {
+    if (rho < rho_n_)
+    {
       return om1(rho);
     }
-    if (rho >= rho_0_) {
+    if (rho >= rho_0_)
+    {
       return om3(rho);
     }
     return om2(rho);
   }
-  inline double d_om(double rho) const {
-    if (rho < rho_n_) {
+  inline double d_om(double rho) const
+  {
+    if (rho < rho_n_)
+    {
       return d_om1(rho);
     }
-    if (rho >= rho_0_) {
+    if (rho >= rho_0_)
+    {
       return d_om3(rho);
     }
     return d_om2(rho);
@@ -179,11 +200,13 @@ public:
         energy_unit_(params_json.value("energy_unit", 0.0)),
         r_cut_(params_json.value("r_cut", 0.0)), r_cut_sqr_(r_cut_ * r_cut_) {};
 
-  inline PotentialType getPotentialType() const {
+  inline PotentialType getPotentialType() const
+  {
     return type_;
   } // Getter for type
 
-  std::string getData() const override {
+  std::string getData() const override
+  {
     std::ostringstream oss;
     oss.precision(16);
     oss << "Using EAM potential!" << "\n\tR_e = " << r_e_
@@ -202,21 +225,29 @@ public:
     return oss.str();
   }
 
-  inline double getU(double rho_f, double mu) const override {
+  inline double getU(double rho_f, double mu) const override
+  {
     return om(rho_f) + 0.5 * mu;
   };
 
   inline double getFU(double rho_f_i, double rho_f_j, double d_rho_f_ij,
-                      double d_mu_ij) const override {
+                      double d_mu_ij) const override
+  {
     return -((d_om(rho_f_i) + d_om(rho_f_j)) * d_rho_f_ij + d_mu_ij);
   };
 
-  inline double getU(double r) const override {
+  inline double getU(double r) const override
+  {
     throw std::runtime_error("getU(r) not implemented for EAM");
   }; // Потенциальная энергия
-  inline double getFU(double r) const override {
+  inline double getFU(double r) const override
+  {
     throw std::runtime_error("getFU(r) not implemented for EAM");
   }; // Сила потенциала
+  inline const LJResult getAll(double r) const override
+  {
+    throw std::runtime_error("getAll(r) not implemented for EAM");
+  }; // Сила и энергия потенциала
 
   inline double getRcut() const override { return r_cut_; }
   inline double getSqrRcut() const override { return r_cut_sqr_; }

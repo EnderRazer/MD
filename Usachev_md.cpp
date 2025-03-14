@@ -4,6 +4,8 @@
 #include <sstream>
 // #include <omp.h>
 
+double force_avg_time = 0.0;
+
 #include <nlohmann/json.hpp>
 // Классы
 #include "classes/Matrix3.h"   //Матрица 3х3
@@ -18,9 +20,10 @@
 #include "macroparams/EnsembleManager.h" //Менеджер ансамблей
 #include "macroparams/Macroparams.h"     //Алгоритмы расчета макропараметров
 
-#include "barostats/Barostat.h"     //Интерфейс баростата
-#include "potentials/Potential.h"   //Интерфейс потенциала
-#include "thermostats/Thermostat.h" //Интерфейс термостата
+#include "barostats/Barostat.h"               //Интерфейс баростата
+#include "potentials/Potential.h"             //Интерфейс потенциала
+#include "thermostats/Thermostat.h"           //Интерфейс термостата
+#include "macroparams/TransportCoefficient.h" //Интерфейс алгоритмов ТК
 
 #include "backups/BackupManager.h" //Бекапы
 #include "output/OutputManager.h"  // Вывод в файлы
@@ -32,6 +35,9 @@
 
 #include "thermostats/Berendsen.h" //Термостат Берендсена
 #include "thermostats/Langevin.h"  //Термостат Ланжевена
+
+#include "macroparams/GreenKubo.h"
+#include "macroparams/Einstein.h"
 
 #include "generators/Generator.h" //Генератор координат и частиц (для инициализации)
 
@@ -230,5 +236,6 @@ int main(int argc, char *argv[])
   }
   timer.stop();
   cout << "Time elapsed: " << timer.elapsed() << endl;
+  cout << "AVG FORCE CALC TIME: " << force_avg_time / settings.steps() << endl;
   return 0;
 }
