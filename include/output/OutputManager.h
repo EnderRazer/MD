@@ -90,11 +90,9 @@ public:
                                     "_particles.csv");
   }
 
-  void writeEnsemblesDetailed(const EnsembleManager &manager) const
+  void writeEnsemblesDetailed(const std::vector<Ensemble> &ensembles) const
   {
-    std::vector<Ensemble> ensembles = manager.getEnsembles();
-
-    for (Ensemble &ens : ensembles)
+    for (const Ensemble &ens : ensembles)
     {
       if (ens.cur_ - 1 < 0)
         continue;
@@ -119,7 +117,7 @@ public:
     }
   }
 
-  void writeAvgEnsembleDetailed(const EnsembleManager &manager) const
+  void writeAvgEnsembleDetailed(const EnsembleManager *manager) const
   {
     std::string filename = ens_dir_ + "/ensemble_avg.csv";
     bool file_exists = fs::exists(filename);
@@ -134,15 +132,15 @@ public:
            << "CVisc;"
            << "\n";
 
-    std::vector<double> ensembles_accum_acfv_ = manager.getEnsemblesAccumAcfv();
-    std::vector<double> ensembles_accum_acfp_ = manager.getEnsemblesAccumAcfp();
+    std::vector<double> ensembles_accum_acfv_ = manager->getEnsemblesAccumAcfv();
+    std::vector<double> ensembles_accum_acfp_ = manager->getEnsemblesAccumAcfp();
 
     std::vector<double> ensembles_coef_diff_integral_ =
-        manager.getEnsemblesCoefDiffIntegral();
+        manager->getEnsemblesCoefDiffIntegral();
     std::vector<double> ensembles_coef_visc_integral_ =
-        manager.getEnsemblesCoefViscIntegral();
+        manager->getEnsemblesCoefViscIntegral();
 
-    for (int i = 0; i < manager.getEnsembleSize(); i++)
+    for (int i = 0; i < manager->getEnsembleSize(); i++)
     {
       file << i << ";"
            << ensembles_accum_acfv_[i] << ";"

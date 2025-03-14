@@ -11,10 +11,11 @@ private:
   Timer timer_{1};
   Settings &settings_;
   ThreadPool &threadPool_;
-  EnsembleManager &ensemble_manager_;
+
   BackupManager &backupManager_;
   OutputManager &outputManager_;
 
+  std::unique_ptr<EnsembleManager> ensemble_manager_;
   std::unique_ptr<Thermostat> thermostat_;
   std::unique_ptr<Barostat> barostat_;
 
@@ -127,12 +128,15 @@ public:
     sys_.setTemperature(macroparams_.getTemperature(sys_));
     sys_.setPressure(macroparams_.getPressure(sys_));
 
-    std::cout << "Расчет транспортных коэффициентов" << std::endl;
-    ensemble_manager_.accumulateGreenCubo(sys_);
+    if (ensemble_manager_ && ensemble_manager_->enabled())
+    {
+      std::cout << "Расчет транспортных коэффициентов" << std::endl;
+      ensemble_manager_->accumulateGreenCubo(sys_);
+      outputManager_.writeEnsemblesDetailed(ensemble_manager_->getEnsembles());
+    }
     // Вывод в файл
     outputManager_.writeSystemProperties(sys_);
     outputManager_.writeStepData(sys_);
-    outputManager_.writeEnsemblesDetailed(ensemble_manager_);
   }
   bool advanceStep(System &sys_)
   {
@@ -196,8 +200,10 @@ public:
     // Транспортные коэффициенты
     if (macroparams_.enabled())
     {
-      if (!ensemble_manager_.completed() && ensemble_manager_.enabled())
-        ensemble_manager_.accumulateGreenCubo(sys_);
+      if (ensemble_manager_ && ensemble_manager_->enabled() && !ensemble_manager_->completed())
+      {
+        ensemble_manager_->accumulateGreenCubo(sys_);
+      }
     }
 
     if (sys_.currentStep() % outputManager_.frequency() == 0)
@@ -206,15 +212,15 @@ public:
       // Вывод в файл
       outputManager_.writeSystemProperties(sys_);
       outputManager_.writeStepData(sys_);
-      if (macroparams_.enabled() && ensemble_manager_.enabled())
+      if (macroparams_.enabled() && ensemble_manager_->enabled())
       {
         // Вывод в файлы ансамблей
-        outputManager_.writeEnsemblesDetailed(ensemble_manager_);
+        outputManager_.writeEnsemblesDetailed(ensemble_manager_->getEnsembles());
 
         // Вывод усредненных значений ансамблей
-        if (ensemble_manager_.completed())
+        if (ensemble_manager_->completed())
         {
-          outputManager_.writeAvgEnsembleDetailed(ensemble_manager_);
+          outputManager_.writeAvgEnsembleDetailed(ensemble_manager_.get());
           return true;
         }
       }
@@ -225,13 +231,12 @@ public:
   MDAlgorithms() = delete;
   MDAlgorithms(Settings &settings, System &sys, BackupManager &backupManager,
                OutputManager &outputManager, ThreadPool &threadPool,
-               EnsembleManager &ensemble_manager,
+               std::unique_ptr<EnsembleManager> &&ensemble_manager,
                std::unique_ptr<Potential> &&potential,
                std::unique_ptr<Thermostat> &&thermostat,
                std::unique_ptr<Barostat> &&barostat, json macroparams_config)
       : settings_(settings), threadPool_(threadPool),
-
-        ensemble_manager_(ensemble_manager), backupManager_(backupManager),
+        ensemble_manager_(std::move(ensemble_manager)), backupManager_(backupManager),
         outputManager_(outputManager), thermostat_(std::move(thermostat)),
         barostat_(std::move(barostat)),
         force_(settings_, std::move(potential), sys.dimensions()),

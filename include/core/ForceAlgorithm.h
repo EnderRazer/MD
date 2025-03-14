@@ -62,11 +62,11 @@ public:
     {
     case Potential::PotentialType::LJ:
     {
-      // LJResult res = potential_->getAll(lengthSqr);
-      U = potential_->getU(lengthSqr);
-      FU = potential_->getFU(lengthSqr);
-      // U = res.u;
-      // FU = res.fu;
+      LJResult res = potential_->getAll(lengthSqr);
+      // U = potential_->getU(lengthSqr);
+      // FU = potential_->getFU(lengthSqr);
+      U = res.u;
+      FU = res.fu;
       break;
     }
     case Potential::PotentialType::EAM:
