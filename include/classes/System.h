@@ -17,6 +17,7 @@ private:
   Dimensions dimensions_{};           // Размеры системы
   std::vector<Particle> particles_{}; // Частицы
 
+
   Energy energies_{};     // Усредненные энергии системы на 1 частицу
   Energy energies_avg_{}; // Усредненные энергии системы по шагам
 

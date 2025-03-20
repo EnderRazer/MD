@@ -1,15 +1,16 @@
 #ifndef PARTICLE_H
 #define PARTICLE_H
 
-struct ForceCalcValues {
-  Vector3<double> rVec{0, 0, 0};
-  Vector3<double> rVec_mirrored{0, 0, 0};
+struct ForceCalcValues
+{
+  int interaction_count{0};
   double e_pot{0.0};
   Vector3<double> force{0, 0, 0};
   Matrix3 virials{};
 };
 
-class Particle {
+class Particle
+{
 private:
   double mass_{0.0}; // Particle mass
 
@@ -69,24 +70,29 @@ public:
   inline double getVelocityY() const { return velocity_.y(); }
   inline double getVelocityZ() const { return velocity_.z(); }
 
-  inline void setVelocity(const Vector3<double> &vel) {
+  inline void setVelocity(const Vector3<double> &vel)
+  {
     velocity_ = vel;
     updatePulse();
   }
-  inline void setVelocityX(double x) {
+  inline void setVelocityX(double x)
+  {
     velocity_.x() = x;
     updatePulse();
   }
-  inline void setVelocityY(double y) {
+  inline void setVelocityY(double y)
+  {
     velocity_.y() = y;
     updatePulse();
   }
-  inline void setVelocityZ(double z) {
+  inline void setVelocityZ(double z)
+  {
     velocity_.z() = z;
     updatePulse();
   }
 
-  inline void addVelocity(const Vector3<double> &vel) {
+  inline void addVelocity(const Vector3<double> &vel)
+  {
     velocity_ += vel;
     updatePulse();
   }
@@ -110,14 +116,16 @@ public:
   // Energy
 
   inline double energy(Energy::EnergyType type) { return energies_.get(type); }
-  inline const double energy(Energy::EnergyType type) const {
+  inline const double energy(Energy::EnergyType type) const
+  {
     return energies_.get(type);
   }
 
   inline Energy &energies() { return energies_; }
   inline const Energy &energies() const { return energies_; }
 
-  inline void setEnergy(Energy::EnergyType type, double value) {
+  inline void setEnergy(Energy::EnergyType type, double value)
+  {
     energies_.set(type, value);
   }
   inline void setEnergies(const Energy &e) { energies_ = e; }
@@ -125,29 +133,34 @@ public:
   // Pulse
   inline const double pulse() const { return pulse_; }
   inline void setPulse(double p) { pulse_ = p; }
-  inline void updatePulse() {
+  inline void updatePulse()
+  {
     pulse_ = (velocity_.x() + velocity_.y() + velocity_.z()) * mass_;
   }
 
-  inline void applyForceInteraction(ForceCalcValues result) {
+  inline void applyForceInteraction(const ForceCalcValues &result)
+  {
     force_ = result.force;
     virials_ = result.virials;
     energies_.set(Energy::EnergyType::Potential, result.e_pot);
   }
-  inline void updateEnergy(Vector3<double> vcm) {
-    energies_.set(Energy::EnergyType::Kinetic,
-                  mass_ * velocity_.lengthSquared() / 2);
-    energies_.set(Energy::EnergyType::Thermodynamic,
-                  mass_ * (velocity_ - vcm).lengthSquared() / 2);
-    energies_.set(Energy::EnergyType::Internal,
-                  energies_.get(Energy::EnergyType::Potential) +
-                      energies_.get(Energy::EnergyType::Thermodynamic));
-    energies_.set(Energy::EnergyType::Full,
-                  energies_.get(Energy::EnergyType::Potential) +
-                      energies_.get(Energy::EnergyType::Kinetic));
+  inline void updateEnergy(const Vector3<double> &vcm) noexcept
+  {
+    const double velocitySquared = velocity_.lengthSquared();
+    const double relativeVelocitySquared = (velocity_ - vcm).lengthSquared();
+
+    const double kineticEnergy = 0.5 * mass_ * velocitySquared;
+    const double thermoEnergy = 0.5 * mass_ * relativeVelocitySquared;
+    const double potentialEnergy = energies_.get(Energy::EnergyType::Potential);
+
+    energies_.set(Energy::EnergyType::Kinetic, kineticEnergy);
+    energies_.set(Energy::EnergyType::Thermodynamic, thermoEnergy);
+    energies_.set(Energy::EnergyType::Internal, potentialEnergy + thermoEnergy);
+    energies_.set(Energy::EnergyType::Full, potentialEnergy + kineticEnergy);
   }
   // Overload operator<< to output the particle's data
-  friend std::ostream &operator<<(std::ostream &os, const Particle &particle) {
+  friend std::ostream &operator<<(std::ostream &os, const Particle &particle)
+  {
     os << "Particle data:\n"
        << "Mass: " << particle.mass_ << "\n"
        << "Position: " << particle.coord_ << "\n"

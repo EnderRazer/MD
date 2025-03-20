@@ -2,14 +2,13 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-// #include <omp.h>
 
 double force_avg_time = 0.0;
 
 using namespace std;
 
 #include <nlohmann/json.hpp>
-// Классы
+//  Классы
 #include "classes/Matrix3.h"   //Матрица 3х3
 #include "classes/Timer.h"     //Таймер
 #include "classes/Vector3.h"   //3х мерный вектор
@@ -87,8 +86,6 @@ std::unique_ptr<Barostat> createBarostat(const json &config,
     throw std::runtime_error("Неизвестный тип баростата: " + type);
   }
 }
-
-
 
 int main(int argc, char *argv[]) {
   Timer timer(0);

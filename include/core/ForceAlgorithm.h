@@ -5,7 +5,7 @@ class ForceAlgorithm
 {
 private:
   Settings &settings_;
-  Dimensions dim_;
+  Dimensions &dim_;
   std::unique_ptr<Potential> potential_;
 
   // Предрасчеты для EAM
@@ -37,11 +37,17 @@ private:
   }
 
 public:
+  /**
+   * Computes force and related values between two particles.
+   *
+   * @param p1 First particle
+   * @param p2 Second particle
+   * @return Calculation results including force, potential energy, etc.
+   */
   inline ForceCalcValues compute(Particle &p1, Particle &p2)
   {
     ForceCalcValues output;
     Vector3<double> rVec = p1.coord() - p2.coord();
-    output.rVec = rVec;
     // Отражение частицы
     if (settings_.hasPbc())
     {
@@ -50,11 +56,11 @@ public:
       double lz = dim_.lz();
       rVec = mirror_vector(rVec, lx, ly, lz);
     }
-    output.rVec_mirrored = rVec;
     double lengthSqr = rVec.lengthSquared();
     // Проверка на соседство
     if (lengthSqr > potential_->getSqrRcut())
       return output;
+    output.interaction_count++;
     // Расчет силы
     double U = 0.0;
     double FU = 0.0;
@@ -77,7 +83,7 @@ public:
     }
     default:
     {
-      std::cout << "Unknown type of potential" << std::endl;
+      throw std::runtime_error("Unknown type of potential");
       break;
     }
     }
@@ -85,6 +91,10 @@ public:
     output.force = rVec * FU / lengthSqr;
     output.virials = Matrix3().outerProduct(rVec, output.force);
     return output;
+  }
+  inline const double getCutOff() const
+  {
+    return potential_->getRcut();
   }
   ForceAlgorithm() = delete;
   ForceAlgorithm(Settings &settings, std::unique_ptr<Potential> &&potential,

@@ -4,6 +4,7 @@
 #include "CoordinateAlgorithm.h"
 #include "ForceAlgorithm.h"
 #include "VelocityAlgorithm.h"
+#include "classes/CellList.h"
 
 class MDAlgorithms
 {
@@ -83,8 +84,16 @@ public:
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
 
-    const int blockSize =
-        pn / settings_.threads(); // или любая удобная величина
+    /*
+    // Создаем список ячеек
+    std::cout << "Init new cell list" << std::endl;
+    CellList cellList(force_.getCutOff(), sys_.dimensions().sizes());
+    std::cout << cellList.getData() << std::endl;
+    std::cout << "Build cell list" << std::endl;
+    cellList.build(particles);
+    const int blockSize = cellList.getNumCells() / settings_.threads(); // или любая удобная величина
+    */
+    const int blockSize = particles.size() / settings_.threads();
     std::vector<std::future<void>> futures;
 
     for (int start = 0; start < pn; start += blockSize)
@@ -92,21 +101,24 @@ public:
       int end = std::min(start + blockSize, pn);
       // enqueue задачу на вычисление для блока [start, end)
       futures.push_back(
-          threadPool_.enqueue([this, &pn, &particles, start, end]()
+          threadPool_.enqueue([this, &pn, &particles, /*&cellList,*/ start, end]()
                               {
             for (int i = start; i < end; i++) {
               ForceCalcValues result_interaction_i;
               ForceCalcValues interaction_ij;
-              for (int j = 0; j < pn; j++) {
+              //vector<int> neighbors = cellList.getNeighbors(particles[i].coord());
+              //for(int j : neighbors) {
+              for (int j =0; j < pn; j++) {
                 if (i == j)
                   continue;
                 interaction_ij = force_.compute(particles[i], particles[j]);
+                result_interaction_i.interaction_count += interaction_ij.interaction_count;
                 result_interaction_i.e_pot += interaction_ij.e_pot;
                 result_interaction_i.force += interaction_ij.force;
                 result_interaction_i.virials += interaction_ij.virials;
               }
               particles[i].applyForceInteraction(result_interaction_i);
-            } }));
+              } }));
     }
     // Ждём завершения всех
     for (auto &f : futures)
@@ -200,7 +212,8 @@ public:
     // Транспортные коэффициенты
     if (macroparams_.enabled())
     {
-      if (ensemble_manager_ && ensemble_manager_->enabled() && !ensemble_manager_->completed())
+      if (ensemble_manager_ && ensemble_manager_->enabled() &&
+          !ensemble_manager_->completed())
       {
         ensemble_manager_->accumulateGreenCubo(sys_);
       }
@@ -215,7 +228,8 @@ public:
       if (macroparams_.enabled() && ensemble_manager_->enabled())
       {
         // Вывод в файлы ансамблей
-        outputManager_.writeEnsemblesDetailed(ensemble_manager_->getEnsembles());
+        outputManager_.writeEnsemblesDetailed(
+            ensemble_manager_->getEnsembles());
 
         // Вывод усредненных значений ансамблей
         if (ensemble_manager_->completed())
@@ -236,9 +250,9 @@ public:
                std::unique_ptr<Thermostat> &&thermostat,
                std::unique_ptr<Barostat> &&barostat, json macroparams_config)
       : settings_(settings), threadPool_(threadPool),
-        ensemble_manager_(std::move(ensemble_manager)), backupManager_(backupManager),
-        outputManager_(outputManager), thermostat_(std::move(thermostat)),
-        barostat_(std::move(barostat)),
+        ensemble_manager_(std::move(ensemble_manager)),
+        backupManager_(backupManager), outputManager_(outputManager),
+        thermostat_(std::move(thermostat)), barostat_(std::move(barostat)),
         force_(settings_, std::move(potential), sys.dimensions()),
         coords_(settings_), vels_(settings_),
         macroparams_(macroparams_config, settings) {};

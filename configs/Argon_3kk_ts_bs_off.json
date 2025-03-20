@@ -21,10 +21,10 @@
     "macroparam_type": "GK",
     "ensemble": {
       "toggle": false,
-      "threads": 50,
-      "quantity": 100,
-      "size": 1500000,
-      "offset": 5000
+      "threads": 5,
+      "quantity": 10,
+      "size": 100,
+      "offset": 5
     }
   },
   "potential": {
@@ -53,11 +53,11 @@
       "mass": 66.335,
       "struct_type": "CP"
     },
-    "nsteps": 1000,
+    "nsteps": 10000,
     "pbc": true,
     "profiling": false,
     "start_temp": 2.7315,
-    "threads": 1
+    "threads": 5
   },
   "thermostat": {
     "pref_temp": 2.7315,
@@ -70,6 +70,6 @@
     "main_directory": "data",
     "steps_directory": "steps",
     "ensembles_directory": "ensemble",
-    "frequency": 1000
+    "frequency": 10
   }
 }
