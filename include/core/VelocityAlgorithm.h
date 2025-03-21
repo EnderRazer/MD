@@ -1,6 +1,9 @@
 #ifndef VELOCITY_ALGORITHM_H
 #define VELOCITY_ALGORITHM_H
 
+#include <classes/Particle.h>
+#include <core/Settings.h>
+
 class VelocityAlgorithm {
 private:
   Settings &settings_;

@@ -1,5 +1,17 @@
 #ifndef BSBERENDSEN_H
 #define BSBERENDSEN_H
+
+#include "nlohmann/json.hpp"
+#include <cmath>
+#include <sstream>
+#include <string>
+
+#include "classes/Particle.h"
+#include "classes/Vector3.h"
+#include "core/System.h"
+
+#include "Barostat.h"
+
 using json = nlohmann::json;
 
 class BarostatBerendsen : public Barostat {
@@ -33,7 +45,8 @@ public:
   std::string getData() const override {
     std::ostringstream oss;
     oss.precision(16);
-    oss << "Using Berendsen barostat!" << "\n\tToggled: " << toggle_
+    oss << "Using Berendsen barostat!"
+        << "\n\tToggled: " << toggle_
         << "\n\tPrefered pressure: " << pref_pressure_
         << "\n\tTau_b: " << tau_b_ << "\n";
     return oss.str();

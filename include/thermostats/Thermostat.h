@@ -1,3 +1,9 @@
+#ifndef THERMOSTAT_H
+#define THERMOSTAT_H
+
+#include <string>
+
+#include "core/System.h"
 class Thermostat {
 public:
   enum class ThermostatType { BERENDSEN, LANGEVIN };
@@ -13,3 +19,5 @@ public:
 
   inline virtual const ThermostatType getThermostatType() const = 0;
 };
+
+#endif

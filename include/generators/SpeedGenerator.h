@@ -1,6 +1,10 @@
 #ifndef SPEED_GENERATOR_H
 #define SPEED_GENERATOR_H
 
+#include "core/Settings.h"
+#include "core/System.h"
+#include "random_normalized.h"
+
 class SpeedGenerator {
 private:
   double sigma_maxwell_{0.0}; // Константа для распределения скоростей
@@ -29,4 +33,5 @@ public:
   SpeedGenerator(const SpeedGenerator &) = delete;
   SpeedGenerator &operator=(const SpeedGenerator &) = delete;
 };
+
 #endif

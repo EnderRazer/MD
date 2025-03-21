@@ -3,6 +3,19 @@
 //===================================================================================
 #ifndef THERMOSTAT_LNGVN
 #define THERMOSTAT_LNGVN
+
+#include <sstream>
+
+#include "nlohmann/json.hpp"
+#include "random_normalized.h"
+
+#include "classes/Particle.h"
+#include "classes/Vector3.h"
+#include "core/Settings.h"
+#include "core/System.h"
+
+#include "Thermostat.h"
+
 using json = nlohmann::json;
 
 class ThermostatLangevine : public Thermostat {
@@ -18,7 +31,7 @@ private:
 
   double sigma_lang_{0.0}; // Константа для термостата Ланжевена
 
-  double eps_{0.0};                   // Случайная величина (0;1)
+  double eps_{0.0}; // Случайная величина (0;1)
   std::vector<Vector3<double>> Fr_{}; // Случайная сила
   std::vector<Vector3<double>> Ft_{}; // Сила трения
 public:
@@ -79,7 +92,8 @@ public:
   std::string getData() const override {
     std::ostringstream oss;
     oss.precision(16);
-    oss << "Using Langevin thermostat!" << "\n\tToggled: " << toggle_
+    oss << "Using Langevin thermostat!"
+        << "\n\tToggled: " << toggle_
         << "\n\tPrefered temperature: " << pref_temperature_
         << "\n\tTau_t: " << tau_t_ << "\n\tStream velocity: " << Vs_
         << "\n\tSIGMA_LANG: " << sigma_lang_ << "\n";

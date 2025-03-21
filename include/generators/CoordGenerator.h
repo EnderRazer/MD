@@ -1,6 +1,10 @@
 #ifndef COORD_GENERATOR_H
 #define COORD_GENERATOR_H
 
+#include "classes/Vector3.h"
+#include "core/Settings.h"
+#include "core/System.h"
+
 struct CustomLayout {
   Vector3<double> coords;
   Vector3<double> velocities;
@@ -73,8 +77,8 @@ private:
   }
 
 public:
-  CoordinatesGenerator(/* args */);
-  ~CoordinatesGenerator();
+  CoordinatesGenerator(/* args */) = default;
+  ~CoordinatesGenerator() = default;
 
   void startingCoords(System &sys, Settings &settings) {
     if (settings.structType() == std::string("CP")) {
@@ -96,7 +100,4 @@ public:
   CoordinatesGenerator &operator=(const CoordinatesGenerator &) = delete;
 };
 
-CoordinatesGenerator::CoordinatesGenerator(/* args */) {}
-
-CoordinatesGenerator::~CoordinatesGenerator() {}
 #endif

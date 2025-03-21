@@ -3,6 +3,18 @@
 //===================================================================================
 #ifndef TSBERENDSEN_H
 #define TSBERENDSEN_H
+
+#include <sstream>
+
+#include "nlohmann/json.hpp"
+
+#include "classes/Particle.h"
+#include "classes/Vector3.h"
+#include "core/Settings.h"
+#include "core/System.h"
+
+#include "Thermostat.h"
+
 using json = nlohmann::json;
 
 class ThermostatBerendsen : public Thermostat {
@@ -40,7 +52,8 @@ public:
   std::string getData() const override {
     std::ostringstream oss;
     oss.precision(16);
-    oss << "Using Berendsen thermostat!" << "\n\tToggled: " << toggle
+    oss << "Using Berendsen thermostat!"
+        << "\n\tToggled: " << toggle
         << "\n\tPrefered temperature: " << pref_temperature
         << "\n\tTau_t: " << tau_t << "\n";
     return oss.str();

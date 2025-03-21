@@ -1,6 +1,10 @@
 #ifndef COORDINATE_ALGORITHM_H
 #define COORDINATE_ALGORITHM_H
 
+#include "classes/Dimensions.h"
+#include "classes/Particle.h"
+#include "core/Settings.h"
+
 class CoordinateAlgorithm {
 private:
   Settings &settings_;

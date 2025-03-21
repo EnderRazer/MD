@@ -1,7 +1,9 @@
 #ifndef MATRIX3_H
 #define MATRIX3_H
 
-class Matrix3;
+#include <ostream>
+#include <stdexcept>
+
 #include "Vector3.h"
 
 class Matrix3 {

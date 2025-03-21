@@ -1,3 +1,10 @@
+#ifndef BAROSTAT_H
+#define BAROSTAT_H
+
+#include <string>
+
+#include "core/System.h"
+
 class Barostat {
 public:
   enum class BarostatType { BERENDSEN };
@@ -7,3 +14,5 @@ public:
 
   inline virtual const BarostatType getBarostatType() const = 0;
 };
+
+#endif // BAROSTAT_H

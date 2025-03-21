@@ -2,20 +2,15 @@
 #ifndef POTENTIAL_PARAMS_H
 #define POTENTIAL_PARAMS_H
 
-struct LJResult
-{
+#include <string>
+
+struct LJResult {
   double u{0.0};
   double fu{0.0};
 };
-class Potential
-{
+class Potential {
 public:
-  enum class PotentialType
-  {
-    LJ,
-    EAM,
-    UNDEFINED
-  }; // Strongly-typed enum
+  enum class PotentialType { LJ, EAM, UNDEFINED }; // Strongly-typed enum
 private:
   PotentialType type_{PotentialType::UNDEFINED};
   const double r_cut_{0.0};
@@ -24,7 +19,7 @@ private:
 public:
   virtual ~Potential() = 0;
 
-  inline virtual double getU(double r) const = 0;  // Потенциальная энергия
+  inline virtual double getU(double r) const = 0; // Потенциальная энергия
   inline virtual double getFU(double r) const = 0; // Сила потенциала
   inline virtual const LJResult getAll(double r) const = 0;
 

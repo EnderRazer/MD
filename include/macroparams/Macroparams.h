@@ -1,10 +1,16 @@
 #ifndef MACROPARAMS_H
 #define MACROPARAMS_H
 
-#include "EnsembleManager.h"
+#include "nlohmann/json.hpp"
 
-class Macroparams
-{
+#include "classes/Matrix3.h"
+#include "classes/Vector3.h"
+#include "core/Settings.h"
+#include "core/System.h"
+
+using json = nlohmann::json;
+
+class Macroparams {
 private:
   Settings &settings_;
   const double T_CONST;
@@ -12,18 +18,15 @@ private:
 
 public:
   inline const bool enabled() const { return toggle_; }
-  inline double getTemperature(System &sys) const
-  {
+  inline double getTemperature(System &sys) const {
     return sys.energies().get(Energy::EnergyType::Thermodynamic) * T_CONST;
   }
 
-  inline double getPressure(System &sys) const
-  {
+  inline double getPressure(System &sys) const {
     Matrix3 sumMV{};
     Matrix3 sumVirials{};
 
-    for (Particle &p : sys.particles())
-    {
+    for (Particle &p : sys.particles()) {
       sumMV.xx() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
                     (p.velocity().x() - sys.vcm().x()); // xx
       sumMV.xy() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
@@ -66,8 +69,8 @@ public:
 
   Macroparams(json &config, Settings &settings)
       : settings_(settings), toggle_(config.value("toggle", false)),
-        T_CONST((2 / (settings_.constants().D *
-                      settings_.constants().KBOLTZMAN))) {};
+        T_CONST((
+            2 / (settings_.constants().D * settings_.constants().KBOLTZMAN))){};
 
   ~Macroparams() = default;
 };

@@ -1,48 +1,24 @@
-#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <sstream>
-
-double force_avg_time = 0.0;
 
 using namespace std;
 
 #include <nlohmann/json.hpp>
 //  Классы
-#include "classes/Matrix3.h"   //Матрица 3х3
-#include "classes/Timer.h"     //Таймер
-#include "classes/Vector3.h"   //3х мерный вектор
-#include "random_normalized.h" //Генератор случайных чисел
-
-#include "classes/Settings.h"   //Класс настроек
-#include "classes/System.h"     //Класс системы
-#include "classes/ThreadPool.h" //Пул тредов
-
-#include "macroparams/EnsembleManager.h" //Менеджер ансамблей
-#include "macroparams/Macroparams.h" //Алгоритмы расчета макропараметров
-
-#include "barostats/Barostat.h" //Интерфейс баростата
-#include "macroparams/TransportCoefficient.h" //Интерфейс алгоритмов ТК
-#include "potentials/Potential.h"   //Интерфейс потенциала
-#include "thermostats/Thermostat.h" //Интерфейс термостата
-
-#include "backups/BackupManager.h" //Бекапы
-#include "output/OutputManager.h"  // Вывод в файлы
-
-#include "barostats/Berendsen.h" //Баростат
-
+#include "backups/BackupManager.h"   //Бекапы
+#include "barostats/Berendsen.h"     //Баростат
+#include "classes/EnsembleManager.h" //Менеджер ансамблей
+#include "classes/ThreadPool.h"      //Пул тредов
+#include "classes/Timer.h"           //Таймер
+#include "core/MDAlgorithms.h"       //Алгоритмы МД
+#include "core/Settings.h"           //Класс настроек
+#include "core/System.h"             //Класс системы
+#include "generators/Generator.h" //Генератор координат и частиц (для инициализации)
+#include "output/OutputManager.h" // Вывод в файлы
 #include "potentials/EAM.h" //Потенциал погруженного атома (ППА)
 #include "potentials/LJ.h" //Потенциал Леннарда-Джонса
-
 #include "thermostats/Berendsen.h" //Термостат Берендсена
 #include "thermostats/Langevin.h"  //Термостат Ланжевена
-
-#include "macroparams/Einstein.h"
-#include "macroparams/GreenKubo.h"
-
-#include "generators/Generator.h" //Генератор координат и частиц (для инициализации)
-
-#include "core/MDAlgorithms.h" //Алгоритмы МД
 
 using namespace std;
 
@@ -202,17 +178,15 @@ int main(int argc, char *argv[]) {
 
   bool completed = false;
   // Основной цикл МД
-  for (int i = 1; i < settings.steps() + 1; i++) {
+  while (!completed && sys.currentStep() < settings.steps() + 1) {
     step_timer.start();
     completed = md.advanceStep(sys);
     step_timer.stop();
     cout << sys.getShortData() << endl;
-    cout << "Step " << i << " - done in " << step_timer.elapsed() << endl;
-    if (completed)
-      break;
+    cout << "Step " << sys.currentStep() << " - done in "
+         << step_timer.elapsed() << endl;
   }
   timer.stop();
   cout << "Time elapsed: " << timer.elapsed() << endl;
-  cout << "AVG FORCE CALC TIME: " << force_avg_time / settings.steps() << endl;
   return 0;
 }
