@@ -102,8 +102,7 @@ public:
             for (int i = start; i < end; i++) {
               ForceCalcValues result_interaction_i;
               ForceCalcValues interaction_ij;
-              std::vector<int> neighbors =
-                  cellList.getNeighbors(particles[i].coord());
+              std::vector<int> neighbors = cellList.getNeighbors(particles, i);
               for (int j : neighbors) {
                 if (i == j)
                   continue;

@@ -1,8 +1,8 @@
 {
   "backup": {
-    "frequency": 100,
+    "frequency": 10,
     "restore_step": 1000000,
-    "toggle": true
+    "toggle": false
   },
   "barostat": {
     "pref_pressure": 0.101325,
@@ -12,9 +12,9 @@
   },
   "dimensions": {
     "crist_length": 3.338339,
-    "crist_num_x": 20,
-    "crist_num_y": 20,
-    "crist_num_z": 20
+    "crist_num_x": 30,
+    "crist_num_y": 30,
+    "crist_num_z": 30
   },
   "macroparams": {
     "toggle": false,
@@ -70,6 +70,6 @@
     "main_directory": "data",
     "steps_directory": "steps",
     "ensembles_directory": "ensemble",
-    "frequency": 10
+    "frequency": 100
   }
 }
