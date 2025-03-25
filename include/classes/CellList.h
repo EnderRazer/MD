@@ -56,7 +56,8 @@ public:
           int neighborIdx =
               nx + ny * numCells_.x() + nz * numCells_.x() * numCells_.y();
           assert(neighborIdx >= 0 && neighborIdx < totalCells_);
-          /*
+
+          // NEW with distance check aka Verlet List
           for (int i = 0; i < cells_[neighborIdx].size(); ++i) {
             if (index != cells_[neighborIdx][i]) {
               Vector3<double> rVec = particles[cells_[neighborIdx][i]].coord() -
@@ -65,9 +66,9 @@ public:
                 neighbors.push_back(cells_[neighborIdx][i]);
             }
           }
-          */
-          neighbors.insert(neighbors.end(), cells_[neighborIdx].begin(),
-                           cells_[neighborIdx].end());
+          // OLD without distance check
+          // neighbors.insert(neighbors.end(), cells_[neighborIdx].begin(),
+          //                  cells_[neighborIdx].end());
         }
       }
     }
