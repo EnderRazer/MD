@@ -2,11 +2,13 @@
 #define BACKUP_MANAGER_H
 
 #include "nlohmann/json.hpp"
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <stdio.h>
 
 #include "classes/Particle.h"
 #include "classes/Vector3.h"
@@ -18,12 +20,14 @@ class BackupManager {
 public:
   inline bool enabled() const { return toggle_; }
   inline int frequency() const { return backup_frequency_; }
+
   // Write backup data to file
   // Returns true on success, false on failure
   bool createBackup(System &sys) const {
     std::ostringstream oss;
     oss << base_folder_ << "/"
         << "backup_" << sys.currentStep() << ".bak";
+    cleanupBackup(sys.currentStep());
     return writeRecordsToFile(oss.str(), sys);
   }
   // Restore data from backup file
@@ -140,6 +144,32 @@ private:
     }
     inFile.close();
     return true;
+  }
+
+  // Delete old backups, keeping only the most recent 5
+  void cleanupBackup(int step) const {
+    if (step <= 5 * backup_frequency_) {
+      return; // No need to delete backups yet
+    }
+
+    int old_step = step - 5 * backup_frequency_;
+    // Preserve milestone backups (divisible by 100000 or 1000000)
+    if (old_step % 100000 == 0 || old_step % 1000000 == 0) {
+      return;
+    }
+
+    char filename[256]; // Ensure the buffer is large enough
+    std::snprintf(filename, sizeof(filename), "%s/backup_%d.bak",
+                  base_folder_.c_str(), old_step);
+
+    std::filesystem::path backupPath(filename);
+    if (std::filesystem::exists(backupPath)) {
+      try {
+        std::filesystem::remove(backupPath);
+      } catch (const std::filesystem::filesystem_error &e) {
+        std::cerr << "Error deleting backup: " << e.what() << std::endl;
+      }
+    }
   }
 };
 
