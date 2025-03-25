@@ -1,6 +1,7 @@
 #ifndef CELL_LIST_H
 #define CELL_LIST_H
 
+#include <cassert>
 #include <iostream>
 #include <sstream>
 
@@ -38,24 +39,35 @@ public:
     }
   }
 
-  std::vector<int> getNeighbors(const Vector3<double> &pos) const {
+  std::vector<int> getNeighbors(const std::vector<Particle> &particles,
+                                const int index) const {
     std::vector<int> neighbors;
-    int cellIdx = getCellIndex(pos);
+    int cellIdx = getCellIndex(particles[index].coord());
     int cz = cellIdx / (numCells_.x() * numCells_.y());
     int cy = (cellIdx % (numCells_.x() * numCells_.y())) / numCells_.x();
     int cx = (cellIdx % (numCells_.x() * numCells_.y())) % numCells_.x();
 
-    for (int dx = -2; dx <= 2; ++dx) {
-      for (int dy = -2; dy <= 2; ++dy) {
-        for (int dz = -2; dz <= 2; ++dz) {
+    for (int dx = -1; dx <= 1; ++dx) {
+      for (int dy = -1; dy <= 1; ++dy) {
+        for (int dz = -1; dz <= 1; ++dz) {
           int nx = (cx + dx + numCells_.x()) % numCells_.x();
           int ny = (cy + dy + numCells_.y()) % numCells_.y();
           int nz = (cz + dz + numCells_.z()) % numCells_.z();
           int neighborIdx =
               nx + ny * numCells_.x() + nz * numCells_.x() * numCells_.y();
-          if (neighborIdx >= 0 && neighborIdx < totalCells_)
-            neighbors.insert(neighbors.end(), cells_[neighborIdx].begin(),
-                             cells_[neighborIdx].end());
+          assert(neighborIdx >= 0 && neighborIdx < totalCells_);
+          /*
+          for (int i = 0; i < cells_[neighborIdx].size(); ++i) {
+            if (index != cells_[neighborIdx][i]) {
+              Vector3<double> rVec = particles[cells_[neighborIdx][i]].coord() -
+                                     particles[index].coord();
+              if (rVec.length() < cutoff_)
+                neighbors.push_back(cells_[neighborIdx][i]);
+            }
+          }
+          */
+          neighbors.insert(neighbors.end(), cells_[neighborIdx].begin(),
+                           cells_[neighborIdx].end());
         }
       }
     }
@@ -67,9 +79,10 @@ public:
     oss << "CellList Data:";
     oss << "\n\tCutoff: " << cutoff_;
     oss << "\n\tBox Size: " << boxSize_;
-    oss << "\n\tNumber of Cells: " << numCells_;
     oss << "\n\tCell Size: " << cellSize_;
     oss << "\n\tTotal Cells: " << totalCells_;
+    oss << "\n\tNumber of Cells: " << numCells_;
+
     return oss.str();
   }
 
