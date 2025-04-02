@@ -62,6 +62,22 @@ public:
             if (index != cells_[neighborIdx][i]) {
               Vector3<double> rVec = particles[cells_[neighborIdx][i]].coord() -
                                      particles[index].coord();
+              // Mirrorig vector (PBC)
+              if (rVec.x() > boxSize_.x() / 2)
+                rVec.x() -= boxSize_.x();
+              if (rVec.x() <= -boxSize_.x() / 2)
+                rVec.x() += boxSize_.x();
+
+              if (rVec.y() > boxSize_.y() / 2)
+                rVec.y() -= boxSize_.y();
+              if (rVec.y() <= -boxSize_.y() / 2)
+                rVec.y() += boxSize_.y();
+
+              if (rVec.z() > boxSize_.z() / 2)
+                rVec.z() -= boxSize_.z();
+              if (rVec.z() <= -boxSize_.z() / 2)
+                rVec.z() += boxSize_.z();
+
               if (rVec.length() < cutoff_)
                 neighbors.push_back(cells_[neighborIdx][i]);
             }
