@@ -97,12 +97,13 @@ public:
     return matrix / scalar;
   }
 
-  inline Matrix3 outerProduct(const Vector3<double> &v1,
-                              const Vector3<double> &v2) {
+  static inline Matrix3 outerProduct(const Vector3<double> &v1,
+                                     const Vector3<double> &v2) {
     Matrix3 result;
     for (int i = 0; i < 3; ++i)
-      for (int j = 0; j < 3; ++j)
+      for (int j = 0; j < 3; ++j) {
         result.m[i][j] = v1[i] * v2[j];
+      }
     return result;
   }
 
