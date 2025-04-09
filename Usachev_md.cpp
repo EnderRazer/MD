@@ -14,9 +14,9 @@ using namespace std;
 #include "core/Settings.h"           //Класс настроек
 #include "core/System.h"             //Класс системы
 #include "generators/Generator.h" //Генератор координат и частиц (для инициализации)
-#include "output/OutputManager.h" // Вывод в файлы
-#include "potentials/EAM.h" //Потенциал погруженного атома (ППА)
-#include "potentials/LJ.h" //Потенциал Леннарда-Джонса
+#include "output/OutputManager.h"  // Вывод в файлы
+#include "potentials/EAM.h"        //Потенциал погруженного атома (ППА)
+#include "potentials/LJ.h"         //Потенциал Леннарда-Джонса
 #include "thermostats/Berendsen.h" //Термостат Берендсена
 #include "thermostats/Langevin.h"  //Термостат Ланжевена
 
@@ -145,17 +145,17 @@ int main(int argc, char *argv[]) {
   else
     cout << "Баростат выключен" << endl;
 
-  // Заводим переменную EnsembleManager для управления ансамблями
-  std::unique_ptr<EnsembleManager> ensembleManager{nullptr};
-  if (config["macroparams"]["ensemble"].value("toggle", false)) {
-    ensembleManager = std::make_unique<EnsembleManager>(
-        config["macroparams"]["ensemble"], settings, sys, threadPool);
-    cout << ensembleManager->getData() << endl;
-  }
-
   // Заводим переменную Output для вывода в файлы/консоль
   OutputManager outputManager = OutputManager(config["output"], settings);
   cout << outputManager.getData() << endl;
+
+  // Заводим переменную EnsembleManager для управления ансамблями
+  std::unique_ptr<EnsembleManager> ensembleManager{nullptr};
+  if (config["ensemble"].value("toggle", false)) {
+    ensembleManager = std::make_unique<EnsembleManager>(
+        config["ensemble"], settings, sys, threadPool, outputManager);
+    cout << ensembleManager->getData() << endl;
+  }
 
   // Заводим переменную MDAlgorimths, которая содержит все методы МД
   json macroparams_config = config["macroparams"];
@@ -169,6 +169,7 @@ int main(int argc, char *argv[]) {
 
   //================
   // НАЧАЛО РАСЧЕТОВ
+  cout << "Начало расчета!" << endl;
   Timer step_timer(0); // Таймер для отслеживания времени выполнения шагов
   step_timer.start();
   md.initialStep(sys); // Начальный (нулевой) шаг
@@ -188,5 +189,6 @@ int main(int argc, char *argv[]) {
   }
   timer.stop();
   cout << "Time elapsed: " << timer.elapsed() << endl;
+  cout << "Завершение расчета" << endl;
   return 0;
 }

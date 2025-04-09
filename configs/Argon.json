@@ -1,78 +1,75 @@
 {
-    "settings" : {
-        "threads":4,
-        "debug" : true,
-        "profiling" : false,
-        "pbc" : true,
-        "start_temp": 2.7315,
-        "nsteps":1000000,
-        "delta_t":0.002,
-        "material" : { 
-            "name" : "Argon",
-            "struct_type" : "CP",
-            "custom":{
-                "particles":[
-                    {
-                        "position":[0.25,0.75,0.5],
-                        "velocity":[1.0,1.0,0.0]
-                    },
-                    {
-                        "position":[0.75,0.75,0.5],
-                        "velocity":[-1.0,-1.0,0.0]
-                    },
-                    {
-                        "position":[1.35,1.75,0.5],
-                        "velocity":[1.0,2.0,0.0]
-                    },
-                    {
-                        "position":[1.68,1.75,0.5],
-                        "velocity":[-1.0,-2.0,0.0]
-                    }
-                ]
-            },
-            "mass":66.335
-        }                     
+  "backup": {
+    "frequency": 10,
+    "restore_step": 1000000,
+    "toggle": false
+  },
+  "barostat": {
+    "pref_pressure": 1.01325,
+    "tau": 1.0,
+    "toggle": true,
+    "type": "BRNDSN"
+  },
+  "dimensions": {
+    "crist_length": 3.338339,
+    "crist_num_x": 30,
+    "crist_num_y": 30,
+    "crist_num_z": 30
+  },
+  "macroparams": {
+    "toggle": false,
+    "macroparam_type": "GK"
+  },
+  "ensemble": {
+    "toggle": false,
+    "threads": 5,
+    "quantity": 10,
+    "size": 100,
+    "offset": 5
+  },
+  "potential": {
+    "params": {
+      "epsilon": 1.712,
+      "sigma": 0.3418
     },
-    "dimensions":{
-        "crist_length":3.338339,
-        "crist_num_x":10,
-        "crist_num_y":10,
-        "crist_num_z":10
-    },
-    "potential":{
-        "type":"LJ",
-        "params":{
-            "epsilon":1.712,
-            "sigma":0.3418
-        }
-    },
-    "backup" : {
-        "toggle" : false,
-        "restore_step" : 36800,
-        "frequency":100
-    },
-    "macroparams" : {
-        "toggle" : false, 
-        "macroparam_type" : "GK",
-        "ensemble": {
-            "toggle":false,
-            "quantity":100,
-            "size":10000,
-            "offset":10
-        }
-    },
-    "thermostat":{
-        "toggle":true,
-        "type":"LNGVN",
-        "pref_temp":2.7315,
-        "tau":1.0,
-        "stream_velocity":[0.0,0.0,0.0]
-    },
-    "barostat":{
-        "toggle":false,
-        "type":"BRNDSN",
-        "pref_pressure":0.101325,
-        "tau":1.0
-    }
-    
+    "type": "LJ"
+  },
+  "settings": {
+    "debug": true,
+    "delta_t": 0.001,
+    "nsteps": 10000,
+    "pbc": true,
+    "profiling": false,
+    "start_temp": 2.7315,
+    "threads": 5
+  },
+  "material": {
+    "mass": 66.335,
+    "struct_type": "CP"
+  },
+  "custom": {
+    "particles": [
+      {
+        "position": [1.5, 1.5, 0.0],
+        "velocity": [1.0, 1.0, 0.0]
+      },
+      {
+        "position": [2.0, 2.0, 0.0],
+        "velocity": [-1.0, -1.0, 0.0]
+      }
+    ]
+  },
+  "thermostat": {
+    "pref_temp": 2.7315,
+    "stream_velocity": [0.0, 0.0, 0.0],
+    "tau": 1.0,
+    "toggle": true,
+    "type": "BRNDSN"
+  },
+  "output": {
+    "main_directory": "data",
+    "steps_directory": "steps",
+    "ensembles_directory": "ensemble",
+    "frequency": 100
+  }
 }
