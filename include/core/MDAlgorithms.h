@@ -1,6 +1,11 @@
 #ifndef MDALGORITHMS_H
 #define MDALGORITHMS_H
 
+#include <cassert>
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <ostream>
 #include <vector>
 
 #include "CoordinateAlgorithm.h"
@@ -9,11 +14,15 @@
 #include "backups/BackupManager.h"
 #include "barostats/Barostat.h"
 #include "classes/CellList.h"
+#include "classes/EnsembleManager.h"
 #include "classes/ThreadPool.h"
 #include "classes/Timer.h"
 #include "macroparams/Macroparams.h"
 #include "output/OutputManager.h"
+#include "potentials/Potential.h"
 #include "thermostats/Thermostat.h"
+
+using json = nlohmann::json;
 
 class MDAlgorithms {
 private:
@@ -45,20 +54,23 @@ public:
     for (int start = 0; start < pn; start += blockSize) {
       int end = std::min(start + blockSize, pn);
       // enqueue задачу на вычисление для блока [start, end)
-      futures.push_back(
-          threadPool_.enqueue([this, &particles, &dim, start, end]() {
-            for (int i = start; i < end; i++) {
-              coords_.compute(particles[i]);
-              if (settings_.hasPbc())
-                coords_.applyPBC(particles[i], dim);
-            }
-          }));
+      futures.push_back(threadPool_.enqueue([this, &particles, &dim, start,
+                                             end]() {
+        for (int i = start; i < end; i++) {
+          coords_.compute(particles[i]);
+          if (settings_.hasPbc())
+            coords_.applyPBC(particles[i], dim);
+          assert(particles[i].getCoordX() > 0 && particles[i].getCoordY() > 0 &&
+                 particles[i].getCoordZ() > 0);
+        }
+      }));
     }
     // Ждём завершения всех
     for (auto &f : futures) {
       f.get();
     }
   }
+
   void CalculateVelocities(System &sys_) {
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
@@ -81,6 +93,7 @@ public:
       f.get();
     }
   }
+
   void CalculateForces(System &sys_) {
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
@@ -94,6 +107,35 @@ public:
                           settings_.threads(); // или любая удобная величина
     std::vector<std::future<void>> futures;
 
+    // Предрасчеты для потенциала EAM
+    if (force_.getPotentialType() == Potential::PotentialType::EAM) {
+      std::cout << "EAM force precalc" << std::endl;
+      for (int start = 0; start < pn; start += blockSize) {
+        int end = std::min(start + blockSize, pn);
+        // enqueue задачу на вычисление для блока [start, end)
+        futures.push_back(threadPool_.enqueue([this, &pn, &particles, &cellList,
+                                               start, end]() {
+          for (int i = start; i < end; i++) {
+            particles[i].setElectronDensity(0.0);
+            particles[i].setPairPotential(0.0);
+            std::vector<int> neighbors = cellList.getNeighbors(particles, i);
+            for (int j : neighbors) {
+              if (i == j)
+                continue;
+              force_.preCompute(particles[i], particles[j]);
+            }
+          }
+        }));
+      }
+      // Ждём завершения всех
+      for (auto &f : futures) {
+        f.get();
+      }
+    }
+
+    // Основной блок расчетов
+    futures.clear();
+    std::cout << "Main force calc" << std::endl;
     for (int start = 0; start < pn; start += blockSize) {
       int end = std::min(start + blockSize, pn);
       // enqueue задачу на вычисление для блока [start, end)
@@ -107,13 +149,25 @@ public:
                 if (i == j)
                   continue;
                 interaction_ij = force_.compute(particles[i], particles[j]);
+                std::cout << "Interaction particles (" << i << ", " << j << ")"
+                          << interaction_ij << "\n";
                 result_interaction_i.interaction_count +=
                     interaction_ij.interaction_count;
+                // При ЕАМ возвращается e_pot = 0, так как вычисляется позже
+                // сразу на всю частицу без суммы частей
                 result_interaction_i.e_pot += interaction_ij.e_pot;
                 result_interaction_i.force += interaction_ij.force;
                 result_interaction_i.virials += interaction_ij.virials;
               }
+              if (force_.getPotentialType() == Potential::PotentialType::EAM) {
+                // Потенциальная энергия в ЕАМ считается 1 раз сразу для всей
+                // частицы
+                result_interaction_i.e_pot =
+                    force_.PotentialEnergy_EAM(particles[i]);
+              }
               particles[i].applyForceInteraction(result_interaction_i);
+              std::cout << "Over all interaction particle " << i
+                        << result_interaction_i << "\n";
             }
           }));
     }
@@ -121,6 +175,70 @@ public:
     for (auto &f : futures) {
       f.get();
     }
+
+    double max_Fx = -INFINITY, max_Fy = -INFINITY, max_Fz = -INFINITY;
+    double min_Fx = INFINITY, min_Fy = INFINITY, min_Fz = INFINITY;
+    double sum_Fx = 0, sum_Fy = 0, sum_Fz = 0;
+
+    double max_VirXX = -INFINITY, max_VirYY = -INFINITY, max_VirZZ = -INFINITY;
+    double min_VirXX = INFINITY, min_VirYY = INFINITY, min_VirZZ = INFINITY;
+    double sum_VirXX = 0, sum_VirYY = 0, sum_VirZZ = 0;
+    for (int i = 0; i < pn; i++) {
+      if (particles[i].getForceX() > max_Fx)
+        max_Fx = particles[i].getForceX();
+      if (particles[i].getForceX() < min_Fx)
+        min_Fx = particles[i].getForceX();
+
+      if (particles[i].getForceY() > max_Fy)
+        max_Fy = particles[i].getForceY();
+      if (particles[i].getForceY() < min_Fy)
+        min_Fy = particles[i].getForceY();
+
+      if (particles[i].getForceZ() > max_Fz)
+        max_Fz = particles[i].getForceZ();
+      if (particles[i].getForceZ() < min_Fz)
+        min_Fz = particles[i].getForceZ();
+
+      sum_Fx += particles[i].getForceX();
+      sum_Fy += particles[i].getForceY();
+      sum_Fz += particles[i].getForceZ();
+
+      if (particles[i].virials().xx() > max_VirXX)
+        max_VirXX = particles[i].virials().xx();
+      if (particles[i].virials().xx() < min_VirXX)
+        min_VirXX = particles[i].virials().xx();
+
+      if (particles[i].virials().yy() > max_VirYY)
+        max_VirYY = particles[i].virials().yy();
+      if (particles[i].virials().yy() < min_VirYY)
+        min_VirYY = particles[i].virials().yy();
+
+      if (particles[i].virials().zz() > max_VirZZ)
+        max_VirZZ = particles[i].virials().zz();
+      if (particles[i].virials().zz() < min_VirZZ)
+        min_VirZZ = particles[i].virials().zz();
+
+      sum_VirXX += particles[i].virials().xx();
+      sum_VirYY += particles[i].virials().yy();
+      sum_VirZZ += particles[i].virials().zz();
+    }
+
+    std::cout << "Force max: \n\tFx_max: " << max_Fx << "\n\tFy_max: " << max_Fy
+              << "\n\tFz_max: " << max_Fz
+              << "\nForce min: \n\tFx_min: " << min_Fx
+              << "\n\tFy_min: " << min_Fy << "\n\tFz_min: " << min_Fz
+              << "\nForce sum: \n\tFx_sum: " << sum_Fx
+              << "\n\tFy_sum: " << sum_Fy << "\n\tFz_sum: " << sum_Fz << "\n";
+
+    std::cout << "Virial max: \n\tVirXX_max: " << max_VirXX
+              << "\n\tVirYY_max: " << max_VirYY
+              << "\n\tVirZZ_max: " << max_VirZZ
+              << "\nVirial min: \n\tVirXX_min: " << min_VirXX
+              << "\n\tVirYY_min: " << min_VirYY
+              << "\n\tVirZZ_min: " << min_VirZZ
+              << "\nVirial sum: \n\tVirXX_sum: " << sum_VirXX
+              << "\n\tVirYY_sum: " << sum_VirYY
+              << "\n\tVirZZ_sum: " << sum_VirZZ << "\n";
   }
 
   void initialStep(System &sys_) {
@@ -129,6 +247,7 @@ public:
     CalculateForces(sys_);
     // Обновление центра масс
     sys_.updateVCM();
+    std::cout << sys_.vcm() << std::endl;
     // Обновление энергий
     sys_.updateEnergy();
     // Расчет макропараметров (Температура, давление)
@@ -138,7 +257,6 @@ public:
     if (ensemble_manager_ && ensemble_manager_->enabled()) {
       std::cout << "Расчет транспортных коэффициентов" << std::endl;
       ensemble_manager_->accumulateGreenCubo(sys_);
-      outputManager_.writeEnsemblesDetailed(ensemble_manager_->getEnsembles());
     }
     // Вывод в файл
     outputManager_.writeSystemProperties(sys_);
@@ -203,21 +321,9 @@ public:
     }
 
     if (sys_.currentStep() % outputManager_.frequency() == 0) {
-
       // Вывод в файл
       outputManager_.writeSystemProperties(sys_);
       outputManager_.writeStepData(sys_);
-      if (macroparams_.enabled() && ensemble_manager_->enabled()) {
-        // Вывод в файлы ансамблей
-        outputManager_.writeEnsemblesDetailed(
-            ensemble_manager_->getEnsembles());
-
-        // Вывод усредненных значений ансамблей
-        if (ensemble_manager_->completed()) {
-          outputManager_.writeAvgEnsembleDetailed(ensemble_manager_.get());
-          return true;
-        }
-      }
     }
     return false;
   }
@@ -233,9 +339,8 @@ public:
         ensemble_manager_(std::move(ensemble_manager)),
         backupManager_(backupManager), outputManager_(outputManager),
         thermostat_(std::move(thermostat)), barostat_(std::move(barostat)),
-        force_(settings_, std::move(potential), sys.dimensions()),
-        coords_(settings_), vels_(settings_),
-        macroparams_(macroparams_config, settings){};
+        force_(settings_, std::move(potential), sys), coords_(settings_),
+        vels_(settings_), macroparams_(macroparams_config, settings) {};
 
   ~MDAlgorithms() = default;
 
