@@ -8,7 +8,7 @@ class VelocityAlgorithm {
 private:
   Settings &settings_;
   const double mt_;
-  /* data */
+
 public:
   inline void compute(Particle &p) { p.addVelocity(p.force() * mt_); }
 

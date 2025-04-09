@@ -8,7 +8,7 @@
 class CoordinateAlgorithm {
 private:
   Settings &settings_;
-  /* data */
+
 public:
   inline void compute(Particle &p) {
     p.addCoord(p.velocity() * settings_.dt());
