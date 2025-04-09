@@ -98,6 +98,7 @@ private:
     ens.filename_ = "ensemble_" + std::to_string(ens.id_) + ".csv";
     ens.output_file_ = std::ofstream(
         outputManager_.getEnsembleDir() + "/" + ens.filename_, std::ios::app);
+    writeEnsembleDetailed(ens);
   }
 
   void writeEnsembleDetailed(Ensemble &ens) const {
