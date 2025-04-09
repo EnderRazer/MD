@@ -73,7 +73,7 @@ public:
            (2 * eps_t4_sigma_p12_ / (r_p6 * r_p6) - eps_t4_sigma_p6_ / r_p6);
   }
 
-  inline const LJResult getAll(double r_p2) const override {
+  inline const PotentialResult getAll(double r_p2) const override {
     double r_p6 = r_p2 * r_p2 * r_p2;
     double eps_div_r_p12 = eps_t4_sigma_p12_ / (r_p6 * r_p6);
     double eps_div_r_p6 = eps_t4_sigma_p6_ / r_p6;
@@ -86,8 +86,15 @@ public:
   inline double getU(double rho_f, double mu) const override {
     throw std::runtime_error("getU(rho_f, mu) not implemented for LJ");
   }; // Потенциальная энергия
-  inline double getFU(double rho_f_i, double rho_f_j, double d_rho_f_ij,
-                      double d_mu_ij) const override {
+  inline double getFU(double rho_f_i, double rho_f_j, double r) const override {
+    throw std::runtime_error(
+        "getFU(rho_f_i, rho_f_j, d_rho_f_ij, d_mu_ij) not implemented for LJ");
+  }; // Сила потенциала
+
+  inline double getPairPart(double r) const override {
+    throw std::runtime_error("getU(rho_f, mu) not implemented for LJ");
+  }; // Потенциальная энергия
+  inline double getDensityPart(double r) const override {
     throw std::runtime_error(
         "getFU(rho_f_i, rho_f_j, d_rho_f_ij, d_mu_ij) not implemented for LJ");
   }; // Сила потенциала

@@ -4,7 +4,7 @@
 
 #include <string>
 
-struct LJResult {
+struct PotentialResult {
   double u{0.0};
   double fu{0.0};
 };
@@ -19,14 +19,16 @@ private:
 public:
   virtual ~Potential() = 0;
 
-  inline virtual double getU(double r) const = 0; // Потенциальная энергия
+  inline virtual double getU(double r) const = 0;  // Потенциальная энергия
   inline virtual double getFU(double r) const = 0; // Сила потенциала
-  inline virtual const LJResult getAll(double r) const = 0;
+  inline virtual const PotentialResult getAll(double r) const = 0;
 
   inline virtual double getU(double rho_f,
                              double mu) const = 0; // Потенциальная энергия
-  inline virtual double getFU(double rho_f_i, double rho_f_j, double d_rho_f_ij,
-                              double d_mu_ij) const = 0; // Сила потенциала
+  inline virtual double getFU(double rho_f_i, double rho_f_j,
+                              double r) const = 0; // Сила потенциала
+  inline virtual double getDensityPart(double r) const = 0;
+  inline virtual double getPairPart(double r) const = 0;
   inline virtual std::string getData() const = 0;
 
   inline virtual double getRcut() const = 0;

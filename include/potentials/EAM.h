@@ -150,11 +150,10 @@ private:
   inline double om(double rho) const {
     if (rho < rho_n_) {
       return om1(rho);
-    }
-    if (rho >= rho_0_) {
+    } else if (rho >= rho_0_) {
       return om3(rho);
-    }
-    return om2(rho);
+    } else
+      return om2(rho);
   }
   inline double d_om(double rho) const {
     if (rho < rho_n_) {
@@ -186,7 +185,7 @@ public:
         eta_(params_json.value("eta", 0.0)), m_(params_json.value("m", 0.0)),
         n_(params_json.value("n", 0.0)),
         energy_unit_(params_json.value("energy_unit", 0.0)),
-        r_cut_(params_json.value("r_cut", 0.0)), r_cut_sqr_(r_cut_ * r_cut_){};
+        r_cut_(params_json.value("r_cut", 0.0)), r_cut_sqr_(r_cut_ * r_cut_) {};
 
   inline PotentialType getPotentialType() const override {
     return type_;
@@ -213,13 +212,17 @@ public:
   }
 
   inline double getU(double rho_f, double mu) const override {
-    return om(rho_f) + 0.5 * mu;
+    return energy_unit_ * (om(rho_f) + 0.5 * mu);
   };
 
-  inline double getFU(double rho_f_i, double rho_f_j, double d_rho_f_ij,
-                      double d_mu_ij) const override {
-    return -((d_om(rho_f_i) + d_om(rho_f_j)) * d_rho_f_ij + d_mu_ij);
+  inline double getFU(double rho_f_i, double rho_f_j,
+                      double r_ij) const override {
+    return -energy_unit_ *
+           ((d_om(rho_f_i) + d_om(rho_f_j)) * d_rho_f(r_ij) + d_mu(r_ij));
   };
+
+  inline double getPairPart(double r) const override { return mu(r); }
+  inline double getDensityPart(double r) const override { return rho_f(r); }
 
   inline double getU(double r) const override {
     throw std::runtime_error("getU(r) not implemented for EAM");
@@ -227,7 +230,7 @@ public:
   inline double getFU(double r) const override {
     throw std::runtime_error("getFU(r) not implemented for EAM");
   }; // Сила потенциала
-  inline const LJResult getAll(double r) const override {
+  inline const PotentialResult getAll(double r) const override {
     throw std::runtime_error("getAll(r) not implemented for EAM");
   }; // Сила и энергия потенциала
 
