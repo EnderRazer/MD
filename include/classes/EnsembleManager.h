@@ -1,6 +1,7 @@
 #ifndef ENSEMBLE_MANAGER_H
 #define ENSEMBLE_MANAGER_H
 
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -16,13 +17,17 @@
 #include "core/System.h"
 #include "macroparams/Einstein.h"
 #include "macroparams/GreenKubo.h"
+#include "output/OutputManager.h"
 
 struct Ensemble {
-  int id_;
+  int id_;  // Идентификатор ансамбля
   int cur_; // Внутренний счетчик ансамбля
 
-  std::vector<Vector3<double>> // Начальные компоненты скорости
-      init_velocity_{{0.0, 0.0, 0.0}}; // (для расчетов коэффициента диффузии)
+  std::string filename_;      // Имя файла для записи данных ансамбля
+  std::ofstream output_file_; // Файл для записи данных ансамбля
+
+  std::vector<Vector3<double>>          // Начальные компоненты скорости
+      init_velocity_{{0.0, 0.0, 0.0}};  // (для расчетов коэффициента диффузии)
   std::vector<double> accum_acfv_{0.0}; // Автокорреляционные функции скорости
   std::vector<double> coef_diff_integral_{0.0}; // Интеграл от АКФ
 
@@ -36,41 +41,42 @@ using json = nlohmann::json;
 
 class EnsembleManager {
 private:
-  bool finished_{false};
+  ThreadPool &threadPool_;       // Пул потоков для параллельных вычислений
+  OutputManager &outputManager_; // Менеджер вывода данных
+
+  IncrementalIntegrator integral_diff_; // Интеграл от АКФ
+  IncrementalIntegrator integral_visc_; // Интеграл от АКФ
+  GreenKubo gk; // Методы Грин-Кубо для транспортных коэффициентов
+
   bool toggle_{false};
-  ThreadPool &threadPool_;
-  IncrementalIntegrator integral_diff_;
-  IncrementalIntegrator integral_visc_;
-  GreenKubo gk;
-  int nsteps_;
+  bool finished_{false}; // Флаг завершения работы
+  int nsteps_{0};        // Количество шагов
+
   int ensemble_threads_num_; // Количество параллельных "потоков" ансамблей
-  int ensemble_size_; // Размер ансамбля (кол-во шагов)
-  int ensemble_offset_; // Отступ между ансамблями
-  int ensemble_count_; // Сколько всего полных ансамблей собирать
+  int ensemble_size_;        // Размер ансамбля (кол-во шагов)
+  int ensemble_offset_;      // Отступ между ансамблями
+  int ensemble_count_;       // Сколько всего полных ансамблей собирать
 
   int current_ens_count{0};
-  std::vector<Ensemble> ensembles_;
-
-  std::vector<double> ensembles_accum_acfv_{0.0};
-  std::vector<double> ensembles_accum_acfp_{0.0};
-
-  std::vector<double> ensembles_coef_diff_integral_{0.0};
-  std::vector<double> ensembles_coef_visc_integral_{0.0};
+  std::vector<Ensemble> ensembles_; // Вектор ансамблей
+  Ensemble avg_ensemble_;           // Сборник ансамблей
 
   inline void flushEnsemble(Ensemble &ens) {
     ens.cur_ = 0;
     for (int i = 0; i < ensemble_size_; i++) {
       // Записываем
-      ensembles_accum_acfv_[i] += ens.accum_acfv_[i];
-      ensembles_accum_acfp_[i] += ens.accum_acfp_[i];
-      ensembles_coef_diff_integral_[i] += ens.coef_diff_integral_[i];
-      ensembles_coef_visc_integral_[i] += ens.coef_visc_integral_[i];
+      avg_ensemble_.accum_acfv_[i] += ens.accum_acfv_[i];
+      avg_ensemble_.accum_acfp_[i] += ens.accum_acfp_[i];
+      avg_ensemble_.coef_diff_integral_[i] += ens.coef_diff_integral_[i];
+      avg_ensemble_.coef_visc_integral_[i] += ens.coef_visc_integral_[i];
       // Очищаем
       ens.accum_acfv_[i] = 0.0;
       ens.accum_acfp_[i] = 0.0;
       ens.coef_diff_integral_[i] = 0.0;
       ens.coef_visc_integral_[i] = 0.0;
     }
+    ens.filename_ = "";
+    ens.output_file_.close();
   };
 
   inline void initEnsemble(int thread_finished_count, Ensemble &ens,
@@ -89,30 +95,68 @@ private:
       ens.init_velocity_[j] = particles[j].velocity();
     }
     ens.init_pressure_tensors_ = sys.pressureTensors();
+    ens.filename_ = "ensemble_" + std::to_string(ens.id_) + ".csv";
+    ens.output_file_ = std::ofstream(
+        outputManager_.getEnsembleDir() + ens.filename_, std::ios::app);
+  }
+
+  void writeEnsembleDetailed(Ensemble &ens) const {
+    std::vector<std::string> headers = {"n", "ACFV", "CDiff", "ACFP", "CVisc"};
+
+    std::vector<double> row = {
+        static_cast<double>(ens.cur_), ens.accum_acfv_[ens.cur_],
+        ens.coef_diff_integral_[ens.cur_], ens.accum_acfp_[ens.cur_],
+        ens.coef_visc_integral_[ens.cur_]};
+
+    bool writeHeaders = (ens.cur_ == 0);
+
+    outputManager_.writeRowToStream(ens.output_file_, headers, row,
+                                    writeHeaders);
+  }
+
+  void writeAvgEnsembleDetailed(Ensemble &avg_ensemble) const {
+    std::vector<std::string> headers = {"n", "ACFV", "CDiff", "ACFP", "CVisc"};
+    std::vector<std::vector<double>> data;
+
+    // Prepare all data rows
+    for (int i = 0; i < ensemble_size_; i++) {
+      std::vector<double> row = {
+          static_cast<double>(i), avg_ensemble.accum_acfv_[i],
+          avg_ensemble.coef_diff_integral_[i], avg_ensemble.accum_acfp_[i],
+          avg_ensemble.coef_visc_integral_[i]};
+      data.push_back(row);
+    }
+
+    // Use output manager to write the data to the output_file_ stream
+    outputManager_.writeDataToStream(avg_ensemble.output_file_, headers, data,
+                                     true);
   }
 
 public:
   EnsembleManager(json &config, Settings &settings, System &sys,
-                  ThreadPool &threadPool)
+                  ThreadPool &threadPool, OutputManager &outputManager)
       : integral_diff_(settings.dt()), integral_visc_(settings.dt()),
-        threadPool_(threadPool) {
+        threadPool_(threadPool), outputManager_(outputManager) {
     toggle_ = config.value("toggle", false);
     if (toggle_) {
       nsteps_ = settings.steps();
       ensemble_threads_num_ = config.value("threads", 1);
-      ensemble_size_ = config.value("size", 1000000);
-      ensemble_offset_ = config.value("offset", 1000000);
-      ensemble_count_ = config.value("quantity", 100);
+      ensemble_size_ = config.value("size", 0);
+      ensemble_offset_ = config.value("offset", 0);
+      ensemble_count_ = config.value("quantity", 0);
       ensembles_.resize(ensemble_threads_num_);
-      ensembles_accum_acfv_.resize(ensemble_size_, 0.0);
-      ensembles_accum_acfp_.resize(ensemble_size_, 0.0);
 
-      ensembles_coef_diff_integral_.resize(ensemble_size_);
-      ensembles_coef_visc_integral_.resize(ensemble_size_);
+      avg_ensemble_.filename_ = "ensembles_average.csv";
+      avg_ensemble_.output_file_ = std::ofstream(avg_ensemble_.filename_);
+      avg_ensemble_.accum_acfv_.resize(ensemble_size_, 0.0);
+      avg_ensemble_.accum_acfp_.resize(ensemble_size_, 0.0);
+      avg_ensemble_.coef_diff_integral_.resize(ensemble_size_, 0.0);
+      avg_ensemble_.coef_visc_integral_.resize(ensemble_size_, 0.0);
 
       int expected_contribution = 0;
       for (int i = 0; i < ensemble_threads_num_; i++) {
         ensembles_[i].id_ = i;
+        ensembles_[i].filename_ = "ensemble_" + std::to_string(i) + ".csv";
         ensembles_[i].cur_ = -i * ensemble_offset_;
         ensembles_[i].init_velocity_.resize(sys.particleNumber(), {0, 0, 0});
         ensembles_[i].accum_acfv_.resize(ensemble_size_, 0.0);
@@ -150,16 +194,16 @@ public:
   int getCurrentEnsCount() const { return current_ens_count; }
   const std::vector<Ensemble> &getEnsembles() const { return ensembles_; }
   const std::vector<double> &getEnsemblesAccumAcfv() const {
-    return ensembles_accum_acfv_;
+    return avg_ensemble_.accum_acfv_;
   }
   const std::vector<double> &getEnsemblesAccumAcfp() const {
-    return ensembles_accum_acfp_;
+    return avg_ensemble_.accum_acfp_;
   }
   const std::vector<double> &getEnsemblesCoefDiffIntegral() const {
-    return ensembles_coef_diff_integral_;
+    return avg_ensemble_.coef_diff_integral_;
   }
   const std::vector<double> &getEnsemblesCoefViscIntegral() const {
-    return ensembles_coef_visc_integral_;
+    return avg_ensemble_.coef_visc_integral_;
   }
   std::string getData() const {
     std::ostringstream oss;
@@ -227,7 +271,9 @@ public:
             ens.coef_visc_integral_[ens.cur_] =
                 integral_visc_.add_partial(acfp) * sys.dimensions().volume() /
                 (3 * sys.temperature());
-
+            if (ens.cur_ % outputManager_.frequency() == 0) {
+              writeEnsembleDetailed(ens);
+            }
             ens.cur_++;
           }
           return thread_finished_count;
@@ -240,11 +286,13 @@ public:
     } else {
       finished_ = true;
       for (int i = 0; i < ensemble_size_; i++) {
-        ensembles_accum_acfp_[i] /= ensemble_count_;
-        ensembles_accum_acfv_[i] /= ensemble_count_;
-        ensembles_coef_diff_integral_[i] /= ensemble_count_;
-        ensembles_coef_visc_integral_[i] /= ensemble_count_;
+        avg_ensemble_.coef_diff_integral_[i] /= ensemble_count_;
+        avg_ensemble_.coef_visc_integral_[i] /= ensemble_count_;
+
+        avg_ensemble_.accum_acfv_[i] /= ensemble_count_;
+        avg_ensemble_.accum_acfp_[i] /= ensemble_count_;
       }
+      writeAvgEnsembleDetailed(avg_ensemble_);
     }
   };
 };

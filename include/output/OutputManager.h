@@ -3,17 +3,21 @@
 
 #include <filesystem>
 #include <fstream>
+#include <ostream>
 #include <sstream>
 #include <string>
-#include <vector>
 
 #include "nlohmann/json.hpp"
 
 #include "classes/Energy.h"
-#include "classes/EnsembleManager.h"
+#include "core/Settings.h"
+#include "core/System.h"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+class Ensemble;
+class EnsembleManager;
 
 class OutputManager {
 private:
@@ -48,6 +52,91 @@ public:
   OutputManager &operator=(const OutputManager &) = delete;
 
   inline const int frequency() const { return frequency_; }
+  inline const std::string &getEnsembleDir() const { return ens_dir_; }
+  inline const std::string &getStepDir() const { return step_dir_; }
+  inline const std::string &getOutputDir() const { return output_dir_; }
+
+  // Version for writing to a filename
+  template <typename T>
+  void writeDataToFile(const std::string &filename,
+                       const std::vector<std::string> &headers,
+                       const std::vector<std::vector<T>> &data,
+                       bool append = false, const std::string &delimiter = ";",
+                       int precision = 16) const {
+    // Check if file exists (for header writing decision)
+    bool file_exists = fs::exists(filename);
+
+    // Open file in appropriate mode
+    std::ofstream file(filename, append ? std::ios::app : std::ios::out);
+
+    writeToStream(file, headers, data, !file_exists || !append, delimiter,
+                  precision);
+  }
+
+  // Version for writing to an existing ofstream
+  template <typename T>
+  void writeDataToStream(std::ofstream &stream,
+                         const std::vector<std::string> &headers,
+                         const std::vector<std::vector<T>> &data,
+                         bool write_headers = true,
+                         const std::string &delimiter = ";",
+                         int precision = 16) const {
+    writeToStream(stream, headers, data, write_headers, delimiter, precision);
+  }
+
+  // Common implementation used by both versions
+  template <typename T, typename StreamType>
+  void
+  writeToStream(StreamType &stream, const std::vector<std::string> &headers,
+                const std::vector<std::vector<T>> &data, bool write_headers,
+                const std::string &delimiter, int precision) const {
+    // Set precision for floating point numbers
+    stream << std::fixed << std::setprecision(precision);
+
+    // Write header if requested
+    if (write_headers) {
+      for (size_t i = 0; i < headers.size(); ++i) {
+        stream << headers[i];
+        if (i < headers.size() - 1) {
+          stream << delimiter;
+        }
+      }
+      stream << "\n";
+    }
+
+    // Write data rows
+    for (const auto &row : data) {
+      for (size_t i = 0; i < row.size(); ++i) {
+        stream << row[i];
+        if (i < row.size() - 1) {
+          stream << delimiter;
+        }
+      }
+      stream << "\n";
+    }
+  }
+
+  // Convenience functions for single row
+  template <typename T>
+  void writeRowToFile(const std::string &filename,
+                      const std::vector<std::string> &headers,
+                      const std::vector<T> &row, bool append = false,
+                      const std::string &delimiter = ";",
+                      int precision = 16) const {
+    std::vector<std::vector<T>> data = {row};
+    writeDataToFile(filename, headers, data, append, delimiter, precision);
+  }
+
+  template <typename T>
+  void writeRowToStream(std::ofstream &stream,
+                        const std::vector<std::string> &headers,
+                        const std::vector<T> &row, bool write_headers = true,
+                        const std::string &delimiter = ";",
+                        int precision = 16) const {
+    std::vector<std::vector<T>> data = {row};
+    writeDataToStream(stream, headers, data, write_headers, delimiter,
+                      precision);
+  }
 
   void writeModellingProperties(json &config) const {
     std::string filename = output_dir_ + "/launch_config.json";
@@ -59,107 +148,62 @@ public:
   // steps
   void writeSystemProperties(System &sys) const {
     std::string filename = output_dir_ + "/properties.csv";
-    bool file_exists = fs::exists(filename);
 
-    std::ofstream file(filename, std::ios::app);
-    file << std::fixed
-         << std::setprecision(16); // Fixed-point notation with high precision
+    std::vector<std::string> headers = {"Step",       "Temperature", "Pressure",
+                                        "TempAvg",    "PressAvg",    "KineticE",
+                                        "PotentialE", "TotalE",      "Pulse"};
 
-    // Write header if file does not exist
-    if (!file_exists) {
-      file << "Step;"
-           << "Temperature;"
-           << "Pressure;"
-           << "TempAvg;"
-           << "PressAvg;"
-           << "KineticE;"
-           << "PotentialE;"
-           << "TotalE;"
-           << "Pulse;"
-           << "\n";
-    }
-    // Write formatted data
-    file << sys.currentStep() << ";" << sys.temperature() << ";"
-         << sys.pressure() << ";" << sys.temperatureAvg() << ";"
-         << sys.pressureAvg() << ";"
-         << sys.energies().get(Energy::EnergyType::Kinetic) << ";"
-         << sys.energies().get(Energy::EnergyType::Potential) << ";"
-         << sys.energies().get(Energy::EnergyType::Full) << ";" << sys.pulse()
-         << ";"
-         << "\n";
-    file.close();
+    std::vector<double> data = {
+        static_cast<double>(sys.currentStep()),
+        sys.temperature(),
+        sys.pressure(),
+        sys.temperatureAvg(),
+        sys.pressureAvg(),
+        sys.energies().get(Energy::EnergyType::Kinetic),
+        sys.energies().get(Energy::EnergyType::Potential),
+        sys.energies().get(Energy::EnergyType::Full),
+        sys.pulse()};
+
+    writeRowToFile(filename, headers, data, true);
   }
 
   // Create a directory for each step and write particle data
   void writeStepData(System &sys) const {
-    writeParticlesDetailed(sys, step_dir_ + "/step_" +
-                                    std::to_string(sys.currentStep()) +
-                                    "_particles.csv");
-  }
+    std::string filename = step_dir_ + "/step_" +
+                           std::to_string(sys.currentStep()) + "_particles.csv";
 
-  void writeEnsemblesDetailed(const std::vector<Ensemble> &ensembles) const {
-    for (const Ensemble &ens : ensembles) {
-      if (ens.cur_ - 1 < 0)
-        continue;
-      std::string filename =
-          ens_dir_ + "/ensemble_" + std::to_string(ens.id_) + ".csv";
-      bool file_exists = fs::exists(filename);
-      std::ofstream file(filename, std::ios::app);
-      file << std::fixed
-           << std::setprecision(16); // Fixed-point notation with high precision
+    std::vector<std::string> headers = {
+        "n",  "Cx", "Cy", "Cz",         "Vx",       "Vy",    "Vz",
+        "Fx", "Fy", "Fz", "PotentialE", "KineticE", "TotalE"};
 
-      // Header
-      if (!file_exists)
-        file << "n;"
-             << "ACFV;"
-             << "CDiff;"
-             << "ACFP;"
-             << "CVisc;"
-             << "\n";
+    std::vector<std::vector<double>> data;
+    int id = 0;
 
-      file << ens.cur_ - 1 << ";" << ens.accum_acfv_[ens.cur_ - 1] << ";"
-           << ens.coef_diff_integral_[ens.cur_ - 1] << ";"
-           << ens.accum_acfp_[ens.cur_ - 1] << ";"
-           << ens.coef_visc_integral_[ens.cur_ - 1] << ";"
-           << "\n";
-      file.close();
+    for (const auto &particle : sys.particles()) {
+      const auto &id = particle.getId();
+      const auto &coord = particle.coord();
+      const auto &velocity = particle.velocity();
+      const auto &force = particle.force();
+      const auto &energies = particle.energies();
+
+      std::vector<double> row = {static_cast<double>(id),
+                                 coord.x(),
+                                 coord.y(),
+                                 coord.z(),
+                                 velocity.x(),
+                                 velocity.y(),
+                                 velocity.z(),
+                                 force.x(),
+                                 force.y(),
+                                 force.z(),
+                                 energies.get(Energy::EnergyType::Potential),
+                                 energies.get(Energy::EnergyType::Kinetic),
+                                 energies.get(Energy::EnergyType::Full)};
+
+      data.push_back(row);
     }
-  }
 
-  void writeAvgEnsembleDetailed(const EnsembleManager *manager) const {
-    std::string filename = ens_dir_ + "/ensemble_avg.csv";
-    bool file_exists = fs::exists(filename);
-    std::ofstream file(filename);
-    file << std::fixed
-         << std::setprecision(16); // Fixed-point notation with high precision
-
-    // Header
-    if (!file_exists)
-      file << "n;"
-           << "ACFV;"
-           << "CDiff;"
-           << "ACFP;"
-           << "CVisc;"
-           << "\n";
-
-    std::vector<double> ensembles_accum_acfv_ =
-        manager->getEnsemblesAccumAcfv();
-    std::vector<double> ensembles_accum_acfp_ =
-        manager->getEnsemblesAccumAcfp();
-
-    std::vector<double> ensembles_coef_diff_integral_ =
-        manager->getEnsemblesCoefDiffIntegral();
-    std::vector<double> ensembles_coef_visc_integral_ =
-        manager->getEnsemblesCoefViscIntegral();
-
-    for (int i = 0; i < manager->getEnsembleSize(); i++) {
-      file << i << ";" << ensembles_accum_acfv_[i] << ";"
-           << ensembles_coef_diff_integral_[i] << ";"
-           << ensembles_accum_acfp_[i] << ";"
-           << ensembles_coef_visc_integral_[i] << ";"
-           << "\n";
-    }
-    file.close();
+    writeDataToFile(filename, headers, data);
   }
 
   const std::string getData() const {
@@ -168,44 +212,6 @@ public:
         << "\n\tMain directory: " << output_dir_ << "\n\tSteps directory"
         << step_dir_ << "\n\tEnsembles directory: " << ens_dir_ << std::endl;
     return oss.str();
-  }
-
-private:
-  void writeParticlesDetailed(System &sys, const std::string &filename) const {
-    std::ofstream file(filename);
-    file << std::fixed
-         << std::setprecision(16); // Fixed-point notation with high precision
-
-    // Header
-    file << "n;"
-         << "Cx;"
-         << "Cy;"
-         << "Cz;"
-         << "Vx;"
-         << "Vy;"
-         << "Vz;"
-         << "Fx;"
-         << "Fy;"
-         << "Fz;"
-         << "PotentialE;"
-         << "KineticE;"
-         << "TotalE;"
-         << "\n";
-    int id = 0;
-    for (const auto &particle : sys.particles()) {
-      const auto &coord = particle.coord();
-      const auto &velocity = particle.velocity();
-      const auto &force = particle.force();
-      const auto &energies = particle.energies();
-      file << id++ << ";" << coord.x() << ";" << coord.y() << ";" << coord.z()
-           << ";" << velocity.x() << ";" << velocity.y() << ";" << velocity.z()
-           << ";" << force.x() << ";" << force.y() << ";" << force.z() << ";"
-           << energies.get(Energy::EnergyType::Potential) << ";"
-           << energies.get(Energy::EnergyType::Kinetic) << ";"
-           << energies.get(Energy::EnergyType::Full) << ";"
-           << "\n";
-    }
-    file.close();
   }
 };
 
