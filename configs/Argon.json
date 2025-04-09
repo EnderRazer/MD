@@ -1,13 +1,13 @@
 {
   "backup": {
-    "frequency": 10,
+    "frequency": 1000,
     "restore_step": 1000000,
-    "toggle": false
+    "toggle": true
   },
   "barostat": {
     "pref_pressure": 1.01325,
     "tau": 1.0,
-    "toggle": true,
+    "toggle": false,
     "type": "BRNDSN"
   },
   "dimensions": {
@@ -17,15 +17,15 @@
     "crist_num_z": 30
   },
   "macroparams": {
-    "toggle": false,
+    "toggle": true,
     "macroparam_type": "GK"
   },
   "ensemble": {
-    "toggle": false,
+    "toggle": true,
     "threads": 5,
-    "quantity": 10,
-    "size": 100,
-    "offset": 5
+    "quantity": 5,
+    "size": 1000000,
+    "offset": 10000
   },
   "potential": {
     "params": {
@@ -36,8 +36,8 @@
   },
   "settings": {
     "debug": true,
-    "delta_t": 0.001,
-    "nsteps": 10000,
+    "delta_t": 0.002,
+    "nsteps": 1100000,
     "pbc": true,
     "profiling": false,
     "start_temp": 2.7315,
@@ -64,12 +64,12 @@
     "stream_velocity": [0.0, 0.0, 0.0],
     "tau": 1.0,
     "toggle": true,
-    "type": "BRNDSN"
+    "type": "LNGVN"
   },
   "output": {
     "main_directory": "data",
     "steps_directory": "steps",
     "ensembles_directory": "ensemble",
-    "frequency": 100
+    "frequency": 1000
   }
 }

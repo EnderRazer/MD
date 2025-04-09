@@ -2,7 +2,7 @@
 #define MDALGORITHMS_H
 
 #include <cassert>
-#include <cmath>
+// #include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <ostream>
@@ -149,8 +149,9 @@ public:
                 if (i == j)
                   continue;
                 interaction_ij = force_.compute(particles[i], particles[j]);
-                std::cout << "Interaction particles (" << i << ", " << j << ")"
-                          << interaction_ij << "\n";
+                // std::cout << "Interaction particles (" << i << ", " << j <<
+                // ")"
+                //           << interaction_ij << "\n";
                 result_interaction_i.interaction_count +=
                     interaction_ij.interaction_count;
                 // При ЕАМ возвращается e_pot = 0, так как вычисляется позже
@@ -166,8 +167,8 @@ public:
                     force_.PotentialEnergy_EAM(particles[i]);
               }
               particles[i].applyForceInteraction(result_interaction_i);
-              std::cout << "Over all interaction particle " << i
-                        << result_interaction_i << "\n";
+              // std::cout << "Over all interaction particle " << i
+              //           << result_interaction_i << "\n";
             }
           }));
     }
@@ -175,70 +176,71 @@ public:
     for (auto &f : futures) {
       f.get();
     }
+    /*
+        double max_Fx = -INFINITY, max_Fy = -INFINITY, max_Fz = -INFINITY;
+        double min_Fx = INFINITY, min_Fy = INFINITY, min_Fz = INFINITY;
+        double sum_Fx = 0, sum_Fy = 0, sum_Fz = 0;
 
-    double max_Fx = -INFINITY, max_Fy = -INFINITY, max_Fz = -INFINITY;
-    double min_Fx = INFINITY, min_Fy = INFINITY, min_Fz = INFINITY;
-    double sum_Fx = 0, sum_Fy = 0, sum_Fz = 0;
+        double max_VirXX = -INFINITY, max_VirYY = -INFINITY, max_VirZZ =
+       -INFINITY; double min_VirXX = INFINITY, min_VirYY = INFINITY, min_VirZZ =
+       INFINITY; double sum_VirXX = 0, sum_VirYY = 0, sum_VirZZ = 0; for (int i
+       = 0; i < pn; i++) { if (particles[i].getForceX() > max_Fx) max_Fx =
+       particles[i].getForceX(); if (particles[i].getForceX() < min_Fx) min_Fx =
+       particles[i].getForceX();
 
-    double max_VirXX = -INFINITY, max_VirYY = -INFINITY, max_VirZZ = -INFINITY;
-    double min_VirXX = INFINITY, min_VirYY = INFINITY, min_VirZZ = INFINITY;
-    double sum_VirXX = 0, sum_VirYY = 0, sum_VirZZ = 0;
-    for (int i = 0; i < pn; i++) {
-      if (particles[i].getForceX() > max_Fx)
-        max_Fx = particles[i].getForceX();
-      if (particles[i].getForceX() < min_Fx)
-        min_Fx = particles[i].getForceX();
+          if (particles[i].getForceY() > max_Fy)
+            max_Fy = particles[i].getForceY();
+          if (particles[i].getForceY() < min_Fy)
+            min_Fy = particles[i].getForceY();
 
-      if (particles[i].getForceY() > max_Fy)
-        max_Fy = particles[i].getForceY();
-      if (particles[i].getForceY() < min_Fy)
-        min_Fy = particles[i].getForceY();
+          if (particles[i].getForceZ() > max_Fz)
+            max_Fz = particles[i].getForceZ();
+          if (particles[i].getForceZ() < min_Fz)
+            min_Fz = particles[i].getForceZ();
 
-      if (particles[i].getForceZ() > max_Fz)
-        max_Fz = particles[i].getForceZ();
-      if (particles[i].getForceZ() < min_Fz)
-        min_Fz = particles[i].getForceZ();
+          sum_Fx += particles[i].getForceX();
+          sum_Fy += particles[i].getForceY();
+          sum_Fz += particles[i].getForceZ();
 
-      sum_Fx += particles[i].getForceX();
-      sum_Fy += particles[i].getForceY();
-      sum_Fz += particles[i].getForceZ();
+          if (particles[i].virials().xx() > max_VirXX)
+            max_VirXX = particles[i].virials().xx();
+          if (particles[i].virials().xx() < min_VirXX)
+            min_VirXX = particles[i].virials().xx();
 
-      if (particles[i].virials().xx() > max_VirXX)
-        max_VirXX = particles[i].virials().xx();
-      if (particles[i].virials().xx() < min_VirXX)
-        min_VirXX = particles[i].virials().xx();
+          if (particles[i].virials().yy() > max_VirYY)
+            max_VirYY = particles[i].virials().yy();
+          if (particles[i].virials().yy() < min_VirYY)
+            min_VirYY = particles[i].virials().yy();
 
-      if (particles[i].virials().yy() > max_VirYY)
-        max_VirYY = particles[i].virials().yy();
-      if (particles[i].virials().yy() < min_VirYY)
-        min_VirYY = particles[i].virials().yy();
+          if (particles[i].virials().zz() > max_VirZZ)
+            max_VirZZ = particles[i].virials().zz();
+          if (particles[i].virials().zz() < min_VirZZ)
+            min_VirZZ = particles[i].virials().zz();
 
-      if (particles[i].virials().zz() > max_VirZZ)
-        max_VirZZ = particles[i].virials().zz();
-      if (particles[i].virials().zz() < min_VirZZ)
-        min_VirZZ = particles[i].virials().zz();
+          sum_VirXX += particles[i].virials().xx();
+          sum_VirYY += particles[i].virials().yy();
+          sum_VirZZ += particles[i].virials().zz();
+        }
 
-      sum_VirXX += particles[i].virials().xx();
-      sum_VirYY += particles[i].virials().yy();
-      sum_VirZZ += particles[i].virials().zz();
-    }
+        std::cout << "Force max: \n\tFx_max: " << max_Fx << "\n\tFy_max: " <<
+       max_Fy
+                  << "\n\tFz_max: " << max_Fz
+                  << "\nForce min: \n\tFx_min: " << min_Fx
+                  << "\n\tFy_min: " << min_Fy << "\n\tFz_min: " << min_Fz
+                  << "\nForce sum: \n\tFx_sum: " << sum_Fx
+                  << "\n\tFy_sum: " << sum_Fy << "\n\tFz_sum: " << sum_Fz <<
+       "\n";
 
-    std::cout << "Force max: \n\tFx_max: " << max_Fx << "\n\tFy_max: " << max_Fy
-              << "\n\tFz_max: " << max_Fz
-              << "\nForce min: \n\tFx_min: " << min_Fx
-              << "\n\tFy_min: " << min_Fy << "\n\tFz_min: " << min_Fz
-              << "\nForce sum: \n\tFx_sum: " << sum_Fx
-              << "\n\tFy_sum: " << sum_Fy << "\n\tFz_sum: " << sum_Fz << "\n";
-
-    std::cout << "Virial max: \n\tVirXX_max: " << max_VirXX
-              << "\n\tVirYY_max: " << max_VirYY
-              << "\n\tVirZZ_max: " << max_VirZZ
-              << "\nVirial min: \n\tVirXX_min: " << min_VirXX
-              << "\n\tVirYY_min: " << min_VirYY
-              << "\n\tVirZZ_min: " << min_VirZZ
-              << "\nVirial sum: \n\tVirXX_sum: " << sum_VirXX
-              << "\n\tVirYY_sum: " << sum_VirYY
-              << "\n\tVirZZ_sum: " << sum_VirZZ << "\n";
+        std::cout << "Virial max: \n\tVirXX_max: " << max_VirXX
+                  << "\n\tVirYY_max: " << max_VirYY
+                  << "\n\tVirZZ_max: " << max_VirZZ
+                  << "\nVirial min: \n\tVirXX_min: " << min_VirXX
+                  << "\n\tVirYY_min: " << min_VirYY
+                  << "\n\tVirZZ_min: " << min_VirZZ
+                  << "\nVirial sum: \n\tVirXX_sum: " << sum_VirXX
+                  << "\n\tVirYY_sum: " << sum_VirYY
+                  << "\n\tVirZZ_sum: " << sum_VirZZ << "\n";
+                  */
   }
 
   void initialStep(System &sys_) {
