@@ -128,14 +128,44 @@ private:
     std::cout << "Reading " << recordCount << " records." << std::endl;
     sys.particles().clear();
     sys.particles().reserve(recordCount);
+
+    // Get current position after reading header
+    std::streampos headerEnd = inFile.tellg();
+
+    // Calculate file size
+    inFile.seekg(0, std::ios::end);
+    std::streampos fileSize = inFile.tellg();
+
+    // Reset to position after header
+    inFile.seekg(headerEnd);
+
+    // Calculate expected remaining size for old and new formats
+    size_t recordSizeOldFormat = sizeof(double) + sizeof(Vector3<double>) * 2;
+    size_t recordSizeNewFormat =
+        sizeof(int) + sizeof(double) + sizeof(Vector3<double>) * 2;
+    size_t expectedOldSize = recordCount * recordSizeOldFormat;
+    size_t expectedNewSize = recordCount * recordSizeNewFormat;
+
+    // Get actual remaining size
+    std::streamoff remainingSize = fileSize - headerEnd;
+
+    // Determine if we're using old format
+    bool isOldFormat = (static_cast<size_t>(remainingSize) == expectedOldSize);
+
+    std::cout << "Detected " << (isOldFormat ? "old" : "new")
+              << " backup format." << std::endl;
+
     // Read in each Record
     for (size_t i = 0; i < recordCount; ++i) {
-      int id;
+      int id = i;
       double mass;
       Vector3<double> coord;
       Vector3<double> velocity;
 
-      inFile.read(reinterpret_cast<char *>(&id), sizeof(int));
+      if (!isOldFormat) {
+        // New format has explicit ID
+        inFile.read(reinterpret_cast<char *>(&id), sizeof(int));
+      }
       inFile.read(reinterpret_cast<char *>(&mass), sizeof(double));
       inFile.read(reinterpret_cast<char *>(&coord), sizeof(Vector3<double>));
       inFile.read(reinterpret_cast<char *>(&velocity), sizeof(Vector3<double>));
