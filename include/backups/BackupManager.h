@@ -92,7 +92,9 @@ private:
     // NOTE: This assumes 'Record' is trivially copyable (POD).
     // If not, you'd serialize field by field.
     for (const Particle &p : sys.particles()) {
+      int id = p.getId();
       double mass = p.getMass();
+      outFile.write(reinterpret_cast<const char *>(&id), sizeof(int));
       outFile.write(reinterpret_cast<const char *>(&mass), sizeof(double));
       outFile.write(reinterpret_cast<const char *>(&p.coord()),
                     sizeof(Vector3<double>));
@@ -128,15 +130,18 @@ private:
     sys.particles().reserve(recordCount);
     // Read in each Record
     for (size_t i = 0; i < recordCount; ++i) {
+      int id;
       double mass;
       Vector3<double> coord;
       Vector3<double> velocity;
 
+      inFile.read(reinterpret_cast<char *>(&id), sizeof(int));
       inFile.read(reinterpret_cast<char *>(&mass), sizeof(double));
       inFile.read(reinterpret_cast<char *>(&coord), sizeof(Vector3<double>));
       inFile.read(reinterpret_cast<char *>(&velocity), sizeof(Vector3<double>));
 
       Particle p;
+      p.setId(id);
       p.setMass(mass);
       p.setCoord(coord);
       p.setVelocity(velocity);

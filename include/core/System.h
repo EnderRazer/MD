@@ -23,7 +23,7 @@ private:
   Dimensions dimensions_{};           // Размеры системы
   std::vector<Particle> particles_{}; // Частицы
 
-  Energy energies_{}; // Усредненные энергии системы на 1 частицу
+  Energy energies_{};     // Усредненные энергии системы на 1 частицу
   Energy energies_avg_{}; // Усредненные энергии системы по шагам
 
   double temperature_{0.0},
@@ -38,7 +38,7 @@ private:
   inline void initializeParticles(double mass) {
     particles_.reserve(particle_number_);
     for (int i = 0; i < particle_number_; ++i) {
-      particles_.emplace_back(mass);
+      particles_.emplace_back(i, mass);
     }
   }
 

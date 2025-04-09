@@ -10,13 +10,23 @@
 
 struct ForceCalcValues {
   int interaction_count{0};
+  Vector3<double> rVec{0, 0, 0};
   double e_pot{0.0};
   Vector3<double> force{0, 0, 0};
   Matrix3 virials{};
+
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const ForceCalcValues &fcv) {
+    os << "\n\tInteractions: " << fcv.interaction_count
+       << "\n\trVec: " << fcv.rVec << "\n\tPotential energy: " << fcv.e_pot
+       << "\n\tForce: " << fcv.force << "\n\tVirials: " << fcv.virials;
+    return os;
+  }
 };
 
 class Particle {
 private:
+  int id_{0};        // Particle ID
   double mass_{0.0}; // Particle mass
 
   Vector3<double> coord_{};    // Position (coordinate)
@@ -30,13 +40,17 @@ private:
 
   double pulse_{0.0}; // Pulse of the particle
 
+  // EAM Properties
+  double electron_density_{0.0}; // Electron density of the particle
+  double pair_potential_{0.0};   // Pair potential energy of the particle
+
 public:
   // Default constructor: Initializes everything to zero.
   Particle() = default;
   ~Particle() = default;
 
   // Constructor with initial mass
-  Particle(double mass) : mass_(mass) {}
+  Particle(int id, double mass) : id_(id), mass_(mass) {}
 
   // Constructor with initial mass, position, and velocity
   Particle(double mass, const Vector3<double> &coord,
@@ -51,6 +65,10 @@ public:
         virials_(virials), energies_(energy), pulse_(pulse) {}
 
   // Getters and setters
+
+  // ID
+  inline int getId() const { return id_; }
+  inline void setId(int id) { id_ = id; }
 
   // Mass
   inline double getMass() const { return mass_; }
@@ -114,7 +132,6 @@ public:
   inline void setVirials(const Matrix3 &v) { virials_ = v; }
 
   // Energy
-
   inline double energy(Energy::EnergyType type) { return energies_.get(type); }
   inline const double energy(Energy::EnergyType type) const {
     return energies_.get(type);
@@ -133,6 +150,23 @@ public:
   inline void setPulse(double p) { pulse_ = p; }
   inline void updatePulse() {
     pulse_ = (velocity_.x() + velocity_.y() + velocity_.z()) * mass_;
+  }
+
+  inline double const electron_density() const { return electron_density_; }
+  inline double const pairPotential() const { return pair_potential_; }
+
+  inline void setElectronDensity(double density) {
+    electron_density_ = density;
+  }
+  inline void setPairPotential(double potential) {
+    pair_potential_ = potential;
+  }
+
+  inline void addElectronDensity(double density) {
+    electron_density_ += density;
+  }
+  inline void addPairPotential(double potential) {
+    pair_potential_ += potential;
   }
 
   inline void applyForceInteraction(const ForceCalcValues &result) {
