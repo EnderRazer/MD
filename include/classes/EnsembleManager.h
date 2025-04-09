@@ -97,7 +97,7 @@ private:
     ens.init_pressure_tensors_ = sys.pressureTensors();
     ens.filename_ = "ensemble_" + std::to_string(ens.id_) + ".csv";
     ens.output_file_ = std::ofstream(
-        outputManager_.getEnsembleDir() + ens.filename_, std::ios::app);
+        outputManager_.getEnsembleDir() + "/" + ens.filename_, std::ios::app);
   }
 
   void writeEnsembleDetailed(Ensemble &ens) const {
@@ -147,7 +147,8 @@ public:
       ensembles_.resize(ensemble_threads_num_);
 
       avg_ensemble_.filename_ = "ensembles_average.csv";
-      avg_ensemble_.output_file_ = std::ofstream(avg_ensemble_.filename_);
+      avg_ensemble_.output_file_ = std::ofstream(
+          outputManager_.getEnsembleDir() + "/" + avg_ensemble_.filename_);
       avg_ensemble_.accum_acfv_.resize(ensemble_size_, 0.0);
       avg_ensemble_.accum_acfp_.resize(ensemble_size_, 0.0);
       avg_ensemble_.coef_diff_integral_.resize(ensemble_size_, 0.0);
