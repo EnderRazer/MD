@@ -7,6 +7,7 @@
 #include "classes/Vector3.h"
 #include "core/Settings.h"
 #include "core/System.h"
+#include <iostream>
 
 using json = nlohmann::json;
 
@@ -25,7 +26,8 @@ public:
   inline double getPressure(System &sys) const {
     Matrix3 sumMV{};
     Matrix3 sumVirials{};
-
+    std::cout << "SumMV: " << sumMV << "\nSumVirials: " << sumVirials
+              << std::endl;
     for (Particle &p : sys.particles()) {
       sumMV.xx() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
                     (p.velocity().x() - sys.vcm().x()); // xx
@@ -60,7 +62,8 @@ public:
       sumVirials.zy() += p.virials().zy();
       sumVirials.zz() += p.virials().zz();
     }
-
+    std::cout << "SumMV: " << sumMV << "\nSumVirials: " << sumVirials
+              << std::endl;
     Matrix3 p_tensors = (sumMV + 0.5 * sumVirials) / sys.dimensions().volume();
     sys.setPressureTensors(p_tensors);
     // Расчет давления по XX,YY,ZZ компонентам
@@ -69,8 +72,8 @@ public:
 
   Macroparams(json &config, Settings &settings)
       : settings_(settings), toggle_(config.value("toggle", false)),
-        T_CONST((
-            2 / (settings_.constants().D * settings_.constants().KBOLTZMAN))){};
+        T_CONST((2 / (settings_.constants().D *
+                      settings_.constants().KBOLTZMAN))) {};
 
   ~Macroparams() = default;
 };
