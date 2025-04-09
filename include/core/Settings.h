@@ -7,7 +7,7 @@
 using json = nlohmann::json;
 
 struct Constants {
-  const double D{3}; // Число степеней свободы
+  const double D{3};                   // Число степеней свободы
   const double KBOLTZMAN{1.380648528}; // Постоянная Больцмана
 };
 
@@ -57,9 +57,9 @@ public:
           "В файле конфигурации нет настройки дельты по времени");
     delta_t_ = settings.value("delta_t", 0.001);
 
-    if (!settings.contains("material"))
+    if (!config.contains("material"))
       throw std::invalid_argument("В файле конфигурации нет настроек вещества");
-    json material = settings["material"];
+    json material = config["material"];
 
     if (!material.contains("struct_type"))
       throw std::invalid_argument(
@@ -71,13 +71,17 @@ public:
           "В файле конфигурации нет настроек массы вещества");
     mass_ = material.value("mass", 0.0);
 
+    if (struct_type_ == "Custom")
+      if (!config.contains("custom"))
+        throw std::invalid_argument(
+            "В файле конфигурации нет настроек пользовательской структуры");
+    custom_layout_ = config.value("custom", json::object());
+
     // Неважные переменные
     threads_ = settings.value("threads", 1);
     // omp_set_num_threads(threads_);
     debug_ = settings.value("debug", false);
     profiling_ = settings.value("profiling", false);
-    if (struct_type_ == "Custom")
-      custom_layout_ = material.value("custom", json::object());
 
     srand(time(0));
     seed_ = rand();
