@@ -4,6 +4,7 @@
 #include "classes/Vector3.h"
 #include "core/Settings.h"
 #include "core/System.h"
+#include <sys/_types/_off_t.h>
 
 struct CustomLayout {
   Vector3<double> coords;
@@ -19,8 +20,8 @@ private:
       for (int y = 0; y < limit.y(); y++) {
         for (int z = 0; z < limit.z(); z++) {
           Vector3<double> coord(x + offset.x(), y + offset.y(), z + offset.z());
-          sys.particles().at(count).setCoord(coord *
-                                             sys.dimensions().cristLength());
+          sys.particles()[count].setCoord(coord *
+                                          sys.dimensions().cristLength());
           count++;
         }
       }
@@ -35,21 +36,31 @@ private:
     assert(count == sys.particleNumber() && "Particle number mismatch");
   }
   void generateFCC(System &sys, Settings &settings) {
+    Vector3<int> offset = sys.dimensions().numVoid();
     Vector3<int> limit = settings.hasPbc() ? sys.dimensions().numCrists()
                                            : sys.dimensions().numCrists() + 1;
 
     int count = 0;
 
     // FCC: Vertices
-    generateLattice(count, sys, settings, limit);
-
+    generateLattice(count, sys, settings, limit, offset);
+    std::cout << "||Vertices|| Generated: " << count << std::endl;
     // FCC: Face centers
-    generateLattice(count, sys, settings, limit,
-                    Vector3<double>{0.5, 0.5, 0.0});
-    generateLattice(count, sys, settings, limit,
-                    Vector3<double>{0.5, 0.0, 0.5});
-    generateLattice(count, sys, settings, limit,
-                    Vector3<double>{0.0, 0.5, 0.5});
+    generateLattice(
+        count, sys, settings,
+        Vector3<int>{limit.x() - 1, limit.y() - 1, limit.z()},
+        Vector3<double>{offset.x() + 0.5, offset.y() + 0.5, offset.z() + 0.0});
+    std::cout << "||XY Face centers|| Generated: " << count << std::endl;
+    generateLattice(
+        count, sys, settings,
+        Vector3<int>{limit.x() - 1, limit.y(), limit.z() - 1},
+        Vector3<double>{offset.x() + 0.5, offset.y() + 0.0, offset.z() + 0.5});
+    std::cout << "||XZ Face centers|| Generated: " << count << std::endl;
+    generateLattice(
+        count, sys, settings,
+        Vector3<int>{limit.x(), limit.y() - 1, limit.z() - 1},
+        Vector3<double>{offset.x() + 0.0, offset.y() + 0.5, offset.z() + 0.5});
+    std::cout << "||YZ Face centers|| Generated: " << count << std::endl;
 
     assert(count == sys.particleNumber() && "Particle number mismatch");
   }
