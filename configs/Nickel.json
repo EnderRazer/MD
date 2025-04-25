@@ -13,7 +13,7 @@
   "dimensions": {
     "crist_length": 0.35314,
     "crist_num": [12, 12, 12],
-    "void_num": [3, 3, 3]
+    "void_num": [9, 9, 9]
   },
   "macroparams": {
     "toggle": false,
@@ -56,7 +56,7 @@
     "pbc": false,
     "profiling": false,
     "start_temp": 2.7315,
-    "threads": 5
+    "threads": 10
   },
   "material": {
     "mass": 97.463,
