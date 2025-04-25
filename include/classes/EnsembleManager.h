@@ -81,9 +81,15 @@ private:
 
   inline void initEnsemble(int thread_finished_count, Ensemble &ens,
                            System &sys) {
+    if (current_ens_count > 0)
+      ens.id_ += ensembles_.size();
+    if (ens.id_ >= ensemble_count_)
+      return;
+    std::cout << "Initializing ensemble with ID: " << ens.id_ << std::endl;
+
     // Если не успеваем рассчитать полный ансамбль, то и не считаем, чтобы не
     // забирать ресурсы
-    ens.id_ += thread_finished_count + current_ens_count;
+    // Или уже рассчитано нужное количество ансамблей
     if (sys.currentStep() + ensemble_size_ > nsteps_) {
       ens.cur_ = -INT32_MAX; // Просто очень большое отрицательное число до
                              // которого не дойдем
@@ -98,11 +104,11 @@ private:
     ens.filename_ = "ensemble_" + std::to_string(ens.id_) + ".csv";
     ens.output_file_ = std::ofstream(
         outputManager_.getEnsembleDir() + "/" + ens.filename_, std::ios::app);
-    writeEnsembleDetailed(ens);
   }
 
   void writeEnsembleDetailed(Ensemble &ens) const {
-    std::vector<std::string> headers = {"n", "ACFV", "CDiff", "ACFP", "CVisc"};
+    std::vector<std::string> headers = {"Step", "ACFV", "CDiff", "ACFP",
+                                        "CVisc"};
 
     std::vector<double> row = {
         static_cast<double>(ens.cur_), ens.accum_acfv_[ens.cur_],
@@ -116,7 +122,8 @@ private:
   }
 
   void writeAvgEnsembleDetailed(Ensemble &avg_ensemble) const {
-    std::vector<std::string> headers = {"n", "ACFV", "CDiff", "ACFP", "CVisc"};
+    std::vector<std::string> headers = {"Step", "ACFV", "CDiff", "ACFP",
+                                        "CVisc"};
     std::vector<std::vector<double>> data;
 
     // Prepare all data rows
@@ -237,6 +244,7 @@ public:
       const int blockSize =
           ensemble_threads_num_ /
           threadPool_.getThreads(); // или любая удобная величина
+      std::cout << "Block size: " << blockSize << std::endl;
       std::vector<std::future<int>> futures;
 
       for (int start = 0; start < ensemble_threads_num_; start += blockSize) {
@@ -244,6 +252,11 @@ public:
         // enqueue задачу на вычисление для блока [start, end)
         futures.push_back(threadPool_.enqueue([this, &sys, start, end]() {
           int thread_finished_count = 0;
+          if (start > ensembles_.size() || end > ensembles_.size()) {
+            std::cerr << "Index overflow: " << start << "/" << end
+                      << " >= " << ensembles_.size() << std::endl;
+            std::abort();
+          }
           for (int i = start; i < end; i++) {
             Ensemble &ens = ensembles_[i];
             // У ансамблей есть "задержка" начала расчетов, если еще не
@@ -251,12 +264,6 @@ public:
             if (ens.cur_ < 0) {
               ens.cur_++;
               continue;
-            }
-            // Если ансамбль полностью заполнен, записываем в усредненные
-            // значения и обнуляем
-            if (ens.cur_ >= ensemble_size_) {
-              flushEnsemble(ens);
-              thread_finished_count++;
             }
             // Если текущий шаг 0, то инициализируем ансамбль
             if (ens.cur_ == 0) {
@@ -273,10 +280,16 @@ public:
             ens.coef_visc_integral_[ens.cur_] =
                 integral_visc_.add_partial(acfp) * sys.dimensions().volume() /
                 (3 * sys.temperature());
-            if (ens.cur_ % outputManager_.frequency() == 0) {
-              writeEnsembleDetailed(ens);
-            }
+
+            writeEnsembleDetailed(ens);
+
             ens.cur_++;
+            // Если ансамбль полностью заполнен, записываем в усредненные
+            // значения и обнуляем
+            if (ens.cur_ >= ensemble_size_) {
+              flushEnsemble(ens);
+              thread_finished_count++;
+            }
           }
           return thread_finished_count;
         }));
