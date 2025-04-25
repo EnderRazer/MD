@@ -13,6 +13,7 @@
 #include "core/Settings.h"
 #include "core/System.h"
 #include "potentials/Potential.h"
+#include <iostream>
 
 /**
  * @class ForceAlgorithm
@@ -95,6 +96,7 @@ public:
     if (lengthSqr > potential_->getSqrRcut())
       return output;
     output.interaction_count++;
+    double length = rVec.length();
     // Расчет силы
     double U = 0.0;
     double FU = 0.0;
@@ -108,7 +110,6 @@ public:
       break;
     }
     case Potential::PotentialType::EAM: {
-      double length = rVec.length();
       // U = potential_->getU(p1.electron_density(), p1.pairPotential());
       FU = potential_->getFU(p1.electron_density(), p2.electron_density(),
                              length);
@@ -121,27 +122,8 @@ public:
     }
 
     output.e_pot = U;
-    output.force = rVec * FU / lengthSqr;
+    output.force = rVec * FU / length;
     output.virials = Matrix3::outerProduct(rVec, output.force);
-
-    /*
-    Matrix3 matrix;
-
-    matrix.xx() = rVec.x() * output.force.x();
-    matrix.xy() = rVec.x() * output.force.y();
-    matrix.xz() = rVec.x() * output.force.z();
-
-    matrix.yx() = rVec.y() * output.force.x();
-    matrix.yy() = rVec.y() * output.force.y();
-    matrix.yz() = rVec.y() * output.force.z();
-
-    matrix.zx() = rVec.z() * output.force.x();
-    matrix.zy() = rVec.z() * output.force.y();
-    matrix.zz() = rVec.z() * output.force.z();
-
-    std::cout << "Manual matrix: " << matrix << std::endl;
-    std::cout << "Function matrix: " << output.virials << std::endl;
-     */
 
     return output;
   }
@@ -190,6 +172,12 @@ public:
     return potential_->getPotentialType();
   }
 
+  inline const double callCloudCalc(double rho) const {
+    return potential_->getCloud(rho);
+  }
+  inline const double callDerCloudCalc(double rho) const {
+    return potential_->getDerCloud(rho);
+  }
   /**
    * @brief Constructs a ForceAlgorithm with specified settings and potential.
    *
