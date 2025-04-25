@@ -33,8 +33,12 @@ public:
     if (num_crist_.x() < 0 || num_crist_.y() < 0 || num_crist_.z() < 0)
       throw std::invalid_argument("Crystal counts must be non-negative");
 
-    sizes_ = {num_crist_.x() * crist_length_, num_crist_.y() * crist_length_,
-              num_crist_.z() * crist_length_};
+    if (num_void_.x() < 0 || num_void_.y() < 0 || num_void_.z() < 0)
+      throw std::invalid_argument("Void counts must be non-negative");
+
+    sizes_ = {(num_crist_.x() + num_void_.x()) * crist_length_,
+              (num_crist_.y() + num_void_.y()) * crist_length_,
+              (num_crist_.z() + num_void_.z()) * crist_length_};
     recalc();
   }
 
