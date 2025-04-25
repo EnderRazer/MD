@@ -98,7 +98,22 @@ public:
     throw std::runtime_error(
         "getFU(rho_f_i, rho_f_j, d_rho_f_ij, d_mu_ij) not implemented for LJ");
   }; // Сила потенциала
-
+  inline double getDerPairPart(double r) const override {
+    throw std::runtime_error(
+        "getFU(rho_f_i, rho_f_j, d_rho_f_ij, d_mu_ij) not implemented for LJ");
+  };
+  inline double getDerDensityPart(double r) const override {
+    throw std::runtime_error(
+        "getFU(rho_f_i, rho_f_j, d_rho_f_ij, d_mu_ij) not implemented for LJ");
+  };
+  inline double getCloud(double rho) const override {
+    throw std::runtime_error(
+        "getFU(rho_f_i, rho_f_j, d_rho_f_ij, d_mu_ij) not implemented for LJ");
+  }
+  inline double getDerCloud(double rho) const override {
+    throw std::runtime_error(
+        "getFU(rho_f_i, rho_f_j, d_rho_f_ij, d_mu_ij) not implemented for LJ");
+  }
   inline double getRcut() const override { return r_cut_; }
   inline double getSqrRcut() const override { return r_cut_sqr_; }
 };
