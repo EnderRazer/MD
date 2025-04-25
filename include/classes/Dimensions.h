@@ -11,22 +11,22 @@ using json = nlohmann::json;
 
 class Dimensions {
 private:
-  double crist_length_; // Длина кристалической решетки
-  Vector3<int> num_crist_{0, 0, 0}; // Кол-во кристалических решеток
+  double crist_length_;                  // Длина кристалической решетки
+  Vector3<int> num_crist_{0, 0, 0};      // Кол-во кристалических решеток
+  Vector3<int> num_void_{0, 0, 0};       // Кол-во пустых решеток (для металла)
   Vector3<double> sizes_{0.0, 0.0, 0.0}; // Размер системы (нм)
   Vector3<double> half_sizes_{0.0, 0.0, 0.0}; // Половинчатые размеры системы
   Vector3<double> sqr_half_sizes_{0.0, 0.0,
                                   0.0}; // Квадрат половинчатых размеров системы
-  double volume_{0.0}; // Объем
+  double volume_{0.0};                  // Объем
 
 public:
   Dimensions() = default;
   //
   explicit Dimensions(const json &config)
       : crist_length_(config.value("crist_length", 1.0)),
-        num_crist_{config.value("crist_num_x", 1),
-                   config.value("crist_num_y", 1),
-                   config.value("crist_num_z", 1)} {
+        num_crist_{config["crist_num"].get<std::vector<int>>()},
+        num_void_{config["void_num"].get<std::vector<int>>()} {
     if (crist_length_ < 0)
       throw std::invalid_argument("Crystal length must be non-negative");
 
@@ -44,6 +44,7 @@ public:
   inline double cristLength() const { return crist_length_; }
 
   inline Vector3<int> numCrists() const { return num_crist_; }
+  inline Vector3<int> numVoid() const { return num_void_; }
   inline Vector3<double> sizes() const { return sizes_; }
   inline Vector3<double> halfSizes() const { return half_sizes_; }
   inline Vector3<double> sqrHalfSizes() const { return sqr_half_sizes_; }
@@ -164,6 +165,7 @@ public:
     oss.precision(16);
     oss << "System size params:\n\t Crist lenght: " << crist_length_
         << "\n\t Crist num (x,y,z): " << num_crist_
+        << "\n\t Void num (x,y,z): " << num_void_
         << "\n\t Size (lx,ly,lz): " << sizes_ << "\n\t Volume: " << volume_
         << "\n";
 
