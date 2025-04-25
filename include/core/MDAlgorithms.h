@@ -2,7 +2,6 @@
 #define MDALGORITHMS_H
 
 #include <cassert>
-// #include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <ostream>
@@ -15,6 +14,7 @@
 #include "barostats/Barostat.h"
 #include "classes/CellList.h"
 #include "classes/EnsembleManager.h"
+#include "classes/Particle.h"
 #include "classes/ThreadPool.h"
 #include "classes/Timer.h"
 #include "macroparams/Macroparams.h"
@@ -54,16 +54,14 @@ public:
     for (int start = 0; start < pn; start += blockSize) {
       int end = std::min(start + blockSize, pn);
       // enqueue задачу на вычисление для блока [start, end)
-      futures.push_back(threadPool_.enqueue([this, &particles, &dim, start,
-                                             end]() {
-        for (int i = start; i < end; i++) {
-          coords_.compute(particles[i]);
-          if (settings_.hasPbc())
-            coords_.applyPBC(particles[i], dim);
-          assert(particles[i].getCoordX() > 0 && particles[i].getCoordY() > 0 &&
-                 particles[i].getCoordZ() > 0);
-        }
-      }));
+      futures.push_back(
+          threadPool_.enqueue([this, &particles, &dim, start, end]() {
+            for (int i = start; i < end; i++) {
+              coords_.compute(particles[i]);
+              if (settings_.hasPbc())
+                coords_.applyPBC(particles[i], dim);
+            }
+          }));
     }
     // Ждём завершения всех
     for (auto &f : futures) {
@@ -109,7 +107,6 @@ public:
 
     // Предрасчеты для потенциала EAM
     if (force_.getPotentialType() == Potential::PotentialType::EAM) {
-      std::cout << "EAM force precalc" << std::endl;
       for (int start = 0; start < pn; start += blockSize) {
         int end = std::min(start + blockSize, pn);
         // enqueue задачу на вычисление для блока [start, end)
@@ -132,10 +129,8 @@ public:
         f.get();
       }
     }
-
     // Основной блок расчетов
     futures.clear();
-    std::cout << "Main force calc" << std::endl;
     for (int start = 0; start < pn; start += blockSize) {
       int end = std::min(start + blockSize, pn);
       // enqueue задачу на вычисление для блока [start, end)
@@ -149,9 +144,6 @@ public:
                 if (i == j)
                   continue;
                 interaction_ij = force_.compute(particles[i], particles[j]);
-                // std::cout << "Interaction particles (" << i << ", " << j <<
-                // ")"
-                //           << interaction_ij << "\n";
                 result_interaction_i.interaction_count +=
                     interaction_ij.interaction_count;
                 // При ЕАМ возвращается e_pot = 0, так как вычисляется позже
@@ -167,8 +159,6 @@ public:
                     force_.PotentialEnergy_EAM(particles[i]);
               }
               particles[i].applyForceInteraction(result_interaction_i);
-              // std::cout << "Over all interaction particle " << i
-              //           << result_interaction_i << "\n";
             }
           }));
     }
@@ -249,7 +239,6 @@ public:
     CalculateForces(sys_);
     // Обновление центра масс
     sys_.updateVCM();
-    std::cout << sys_.vcm() << std::endl;
     // Обновление энергий
     sys_.updateEnergy();
     // Расчет макропараметров (Температура, давление)
@@ -309,6 +298,7 @@ public:
     sys_.updateEnergyAvg();
     // Обновление импульса
     sys_.updatePulse();
+    sys_.updatePulseAvg();
     // Расчет макропараметров (Температура, давление)
     sys_.setTemperature(macroparams_.getTemperature(sys_));
     sys_.updateTemperatureAvg();
@@ -320,11 +310,15 @@ public:
           !ensemble_manager_->completed()) {
         ensemble_manager_->accumulateGreenCubo(sys_);
       }
+      if (ensemble_manager_->completed()) {
+        return true;
+      }
     }
 
     if (sys_.currentStep() % outputManager_.frequency() == 0) {
       // Вывод в файл
       outputManager_.writeSystemProperties(sys_);
+      outputManager_.writeAvgSystemProperties(sys_);
       outputManager_.writeStepData(sys_);
     }
     return false;
