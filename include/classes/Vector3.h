@@ -2,7 +2,9 @@
 #define VECTOR3_H
 
 #include <cmath>
+#include <cstddef>
 #include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
@@ -34,6 +36,12 @@ public:
   const T &y() const { return components[1]; }
   const T &z() const { return components[2]; }
 
+  // Conversion constructor template
+  template <typename U> Vector3(const Vector3<U> &other) {
+    components[0] = static_cast<T>(other.x());
+    components[1] = static_cast<T>(other.y());
+    components[2] = static_cast<T>(other.z());
+  }
   // Overload operator[] for safe indexed access
   T &operator[](size_t index) {
     if (index >= 3)
@@ -106,6 +114,14 @@ public:
     os << "(" << vec.components[0] << ", " << vec.components[1] << ", "
        << vec.components[2] << ")";
     return os;
+  }
+
+  inline const std::string to_str() const {
+    std::ostringstream os;
+    os.precision(16);
+    os << "(" << components[0] << ", " << components[1] << ", " << components[2]
+       << ")";
+    return os.str();
   }
 };
 
