@@ -149,16 +149,14 @@ public:
   void writeSystemProperties(System &sys) const {
     std::string filename = output_dir_ + "/properties.csv";
 
-    std::vector<std::string> headers = {"Step",       "Temperature", "Pressure",
-                                        "TempAvg",    "PressAvg",    "KineticE",
-                                        "PotentialE", "TotalE",      "Pulse"};
+    std::vector<std::string> headers = {"Step",      "Temperature", "Pressure",
+                                        "KineticE",  "PotentialE",  "ThermalE",
+                                        "InternalE", "TotalE",      "Pulse"};
 
     std::vector<double> data = {
         static_cast<double>(sys.currentStep()),
         sys.temperature(),
         sys.pressure(),
-        sys.temperatureAvg(),
-        sys.pressureAvg(),
         sys.energies().get(Energy::EnergyType::Kinetic),
         sys.energies().get(Energy::EnergyType::Potential),
         sys.energies().get(Energy::EnergyType::Full),
@@ -167,14 +165,33 @@ public:
     writeRowToFile(filename, headers, data, true);
   }
 
+  void writeAvgSystemProperties(System &sys) const {
+    std::string filename = output_dir_ + "/properties_avg.csv";
+
+    std::vector<std::string> headers = {"Step",      "Temperature", "Pressure",
+                                        "KineticE",  "PotentialE",  "ThermalE",
+                                        "InternalE", "TotalE",      "Pulse"};
+
+    std::vector<double> data = {
+        static_cast<double>(sys.currentStep()),
+        sys.temperatureAvg(),
+        sys.pressureAvg(),
+        sys.energiesAvg().get(Energy::EnergyType::Kinetic),
+        sys.energiesAvg().get(Energy::EnergyType::Potential),
+        sys.energiesAvg().get(Energy::EnergyType::Full),
+        sys.pulseAvg()};
+
+    writeRowToFile(filename, headers, data, true);
+  }
   // Create a directory for each step and write particle data
   void writeStepData(System &sys) const {
     std::string filename = step_dir_ + "/step_" +
                            std::to_string(sys.currentStep()) + "_particles.csv";
 
     std::vector<std::string> headers = {
-        "n",  "Cx", "Cy", "Cz",         "Vx",       "Vy",    "Vz",
-        "Fx", "Fy", "Fz", "PotentialE", "KineticE", "TotalE"};
+        "n",          "Cx",       "Cy",       "Cz",        "Vx",
+        "Vy",         "Vz",       "Fx",       "Fy",        "Fz",
+        "PotentialE", "KineticE", "ThermalE", "InternalE", "TotalE"};
 
     std::vector<std::vector<double>> data;
     int id = 0;
@@ -186,19 +203,22 @@ public:
       const auto &force = particle.force();
       const auto &energies = particle.energies();
 
-      std::vector<double> row = {static_cast<double>(id),
-                                 coord.x(),
-                                 coord.y(),
-                                 coord.z(),
-                                 velocity.x(),
-                                 velocity.y(),
-                                 velocity.z(),
-                                 force.x(),
-                                 force.y(),
-                                 force.z(),
-                                 energies.get(Energy::EnergyType::Potential),
-                                 energies.get(Energy::EnergyType::Kinetic),
-                                 energies.get(Energy::EnergyType::Full)};
+      std::vector<double> row = {
+          static_cast<double>(id),
+          coord.x(),
+          coord.y(),
+          coord.z(),
+          velocity.x(),
+          velocity.y(),
+          velocity.z(),
+          force.x(),
+          force.y(),
+          force.z(),
+          energies.get(Energy::EnergyType::Potential),
+          energies.get(Energy::EnergyType::Kinetic),
+          energies.get(Energy::EnergyType::Thermodynamic),
+          energies.get(Energy::EnergyType::Internal),
+          energies.get(Energy::EnergyType::Full)};
 
       data.push_back(row);
     }
