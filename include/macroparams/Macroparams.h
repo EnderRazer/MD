@@ -26,8 +26,6 @@ public:
   inline double getPressure(System &sys) const {
     Matrix3 sumMV{};
     Matrix3 sumVirials{};
-    std::cout << "SumMV: " << sumMV << "\nSumVirials: " << sumVirials
-              << std::endl;
     for (Particle &p : sys.particles()) {
       sumMV.xx() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
                     (p.velocity().x() - sys.vcm().x()); // xx
@@ -62,8 +60,6 @@ public:
       sumVirials.zy() += p.virials().zy();
       sumVirials.zz() += p.virials().zz();
     }
-    std::cout << "SumMV: " << sumMV << "\nSumVirials: " << sumVirials
-              << std::endl;
     Matrix3 p_tensors = (sumMV + 0.5 * sumVirials) / sys.dimensions().volume();
     sys.setPressureTensors(p_tensors);
     // Расчет давления по XX,YY,ZZ компонентам
