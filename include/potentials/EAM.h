@@ -1,6 +1,7 @@
 #ifndef POTENTIAL_EAM
 #define POTENTIAL_EAM
 
+#include <arm/types.h>
 #include <sstream>
 
 #include "nlohmann/json.hpp"
@@ -172,10 +173,8 @@ public:
       : r_e_(params_json.value("r_e", 0.0)),
         f_e_(params_json.value("f_e", 0.0)),
         rho_e_(params_json.value("rho_e", 0.0)),
-        rho_s_(params_json.value("rho_s", 0.0)),
-        rho_n_(params_json.value("rho_n", 0.0)),
-        rho_0_(params_json.value("rho_0", 0.0)),
-        om_e_(params_json.value("om_e", 0.0)),
+        rho_s_(params_json.value("rho_s", 0.0)), rho_n_(rho_e_ * 0.85),
+        rho_0_(rho_e_ * 1.15), om_e_(params_json.value("om_e", 0.0)),
         om_n_(params_json["om_n"].get<std::vector<double>>()),
         om_(params_json["om"].get<std::vector<double>>()),
         alpha_(params_json.value("alpha", 0.0)),
@@ -223,6 +222,12 @@ public:
 
   inline double getPairPart(double r) const override { return mu(r); }
   inline double getDensityPart(double r) const override { return rho_f(r); }
+  inline double getDerPairPart(double r) const override { return d_mu(r); }
+  inline double getDerDensityPart(double r) const override {
+    return d_rho_f(r);
+  }
+  inline double getCloud(double rho) const override { return om(rho); }
+  inline double getDerCloud(double rho) const override { return d_om(rho); }
 
   inline double getU(double r) const override {
     throw std::runtime_error("getU(r) not implemented for EAM");
