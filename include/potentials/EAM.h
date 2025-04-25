@@ -1,7 +1,6 @@
 #ifndef POTENTIAL_EAM
 #define POTENTIAL_EAM
 
-#include <arm/types.h>
 #include <sstream>
 
 #include "nlohmann/json.hpp"

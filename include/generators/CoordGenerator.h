@@ -4,7 +4,6 @@
 #include "classes/Vector3.h"
 #include "core/Settings.h"
 #include "core/System.h"
-#include <sys/_types/_off_t.h>
 
 struct CustomLayout {
   Vector3<double> coords;

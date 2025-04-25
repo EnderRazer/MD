@@ -13,7 +13,6 @@
 #include "core/Settings.h"
 #include "core/System.h"
 #include "potentials/Potential.h"
-#include <iostream>
 
 /**
  * @class ForceAlgorithm
