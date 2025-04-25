@@ -1,6 +1,6 @@
 {
   "backup": {
-    "frequency": 1000,
+    "frequency": 10,
     "restore_step": 1000000,
     "toggle": true
   },
@@ -23,9 +23,9 @@
   "ensemble": {
     "toggle": true,
     "threads": 5,
-    "quantity": 5,
-    "size": 1000000,
-    "offset": 10000
+    "quantity": 10,
+    "size": 5000,
+    "offset": 100
   },
   "potential": {
     "params": {
@@ -70,6 +70,6 @@
     "main_directory": "data",
     "steps_directory": "steps",
     "ensembles_directory": "ensemble",
-    "frequency": 1000
+    "frequency": 10
   }
 }

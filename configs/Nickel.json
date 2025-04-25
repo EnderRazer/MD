@@ -1,20 +1,19 @@
 {
   "backup": {
-    "frequency": 10,
+    "frequency": 1,
     "restore_step": 1000000,
     "toggle": false
   },
   "barostat": {
-    "pref_pressure": 1.01325,
+    "pref_pressure": 0.0,
     "tau": 1.0,
     "toggle": false,
     "type": "BRNDSN"
   },
   "dimensions": {
-    "crist_length": 0.35196,
-    "crist_num_x": 12,
-    "crist_num_y": 12,
-    "crist_num_z": 12
+    "crist_length": 0.35314,
+    "crist_num": [12, 12, 12],
+    "void_num": [3, 3, 3]
   },
   "macroparams": {
     "toggle": false,
@@ -52,12 +51,12 @@
   },
   "settings": {
     "debug": true,
-    "delta_t": 0.001,
-    "nsteps": 1,
-    "pbc": true,
+    "delta_t": 0.002,
+    "nsteps": 1000,
+    "pbc": false,
     "profiling": false,
-    "start_temp": 0.0,
-    "threads": 1
+    "start_temp": 2.7315,
+    "threads": 5
   },
   "material": {
     "mass": 97.463,
@@ -79,13 +78,13 @@
     "pref_temp": 2.7315,
     "stream_velocity": [0.0, 0.0, 0.0],
     "tau": 1.0,
-    "toggle": false,
+    "toggle": true,
     "type": "BRNDSN"
   },
   "output": {
     "main_directory": "data",
     "steps_directory": "steps",
     "ensembles_directory": "ensemble",
-    "frequency": 100
+    "frequency": 1
   }
 }
