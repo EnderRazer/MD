@@ -33,7 +33,8 @@ private:
   Matrix3 pressure_tensors_{};
 
   Vector3<double> vcm_{}; // Скорость центра масс
-  double pulse_{0.0};     // Импульс системы
+  double pulse_{0.0},
+      pulse_avg_{0.0}; // Импульс системы моментальный/усредненный по шагам
 
   inline void initializeParticles(double mass) {
     particles_.reserve(particle_number_);
@@ -140,6 +141,13 @@ public:
 
   inline double pulse() const { return pulse_; }
   inline void setPulse(double p) { pulse_ = p; }
+
+  inline double pulseAvg() const { return pulse_avg_; }
+  inline void setPulseAvg(double pulse_avg) { pulse_avg_ = pulse_avg; }
+  inline void updatePulseAvg() {
+    pulse_avg_ = ((pulse_avg_ * (current_step_ - 1)) + pulse_) / current_step_;
+  }
+
   // Методы
   void updateEnergy() {
     double e_pot = 0, e_kin = 0, e_term = 0, e_int = 0, e_full = 0;
