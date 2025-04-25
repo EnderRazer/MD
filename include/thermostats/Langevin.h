@@ -31,7 +31,7 @@ private:
 
   double sigma_lang_{0.0}; // Константа для термостата Ланжевена
 
-  double eps_{0.0}; // Случайная величина (0;1)
+  double eps_{0.0};                   // Случайная величина (0;1)
   std::vector<Vector3<double>> Fr_{}; // Случайная сила
   std::vector<Vector3<double>> Ft_{}; // Сила трения
 public:
@@ -45,8 +45,8 @@ public:
                         settings.mass()) /
                        (tau_t_ * settings.dt()));
     seed_ = settings.seed();
-    Fr_.reserve(particle_number);
-    Ft_.reserve(particle_number);
+    Fr_.resize(particle_number);
+    Ft_.resize(particle_number);
   }
 
   // Запрещаем копирование
