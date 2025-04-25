@@ -29,6 +29,11 @@ public:
                               double r) const = 0; // Сила потенциала
   inline virtual double getDensityPart(double r) const = 0;
   inline virtual double getPairPart(double r) const = 0;
+  inline virtual double getDerPairPart(double r) const = 0;
+  inline virtual double getDerDensityPart(double r) const = 0;
+  inline virtual double getCloud(double rho) const = 0;
+  inline virtual double getDerCloud(double rho) const = 0;
+
   inline virtual std::string getData() const = 0;
 
   inline virtual double getRcut() const = 0;
