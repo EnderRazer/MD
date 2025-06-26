@@ -38,6 +38,16 @@ private:
   const double r_cut_;
   const double r_cut_sqr_;
 
+  inline Mu_RhoF mu_rho_f(double r) const {
+    double r_over_R_e = r / r_e_;
+    double exp_term1 = exp(-alpha_ * (r_over_R_e - 1));
+    double pow_term1 = pow(r_over_R_e - k_, m_);
+    double exp_term2 = exp(-beta_ * (r_over_R_e - 1));
+    double pow_term2 = pow(r_over_R_e - lambda_, n_);
+
+    return {(f_e_ * exp_term2) / (1 + pow_term2),(a_ * exp_term1 / (1 + pow_term1)) -
+           (b_ * exp_term2 / (1 + pow_term2))};
+  }
   inline double rho_f(double r) const {
     double r_over_R_e = r / r_e_;
     double exp_term = exp(-beta_ * (r_over_R_e - 1));
@@ -221,13 +231,13 @@ public:
 
   inline double getPairPart(double r) const override { return mu(r); }
   inline double getDensityPart(double r) const override { return rho_f(r); }
+  inline Mu_RhoF getPairDesityPart(double r) const override { return mu_rho_f(r); }
   inline double getDerPairPart(double r) const override { return d_mu(r); }
-  inline double getDerDensityPart(double r) const override {
-    return d_rho_f(r);
-  }
+  inline double getDerDensityPart(double r) const override {return d_rho_f(r); }
   inline double getCloud(double rho) const override { return om(rho); }
   inline double getDerCloud(double rho) const override { return d_om(rho); }
 
+  // LJ overrides, not implemented for EAM
   inline double getU(double r) const override {
     throw std::runtime_error("getU(r) not implemented for EAM");
   }; // Потенциальная энергия

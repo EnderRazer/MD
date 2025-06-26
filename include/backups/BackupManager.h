@@ -15,14 +15,40 @@
 #include "core/System.h"
 
 using json = nlohmann::json;
-// The BackupManager class handles saving/restoring these Records
+/**
+ * @brief Класс для управления резервными копиями данных.
+ *
+ * Класс BackupManager отвечает за создание и восстановление резервных копий
+ * данных системы. Он позволяет включать и отключать резервное копирование,
+ * устанавливать частоту создания резервных копий и восстанавливать данные
+ * из резервных копий.
+ */
 class BackupManager {
 public:
+
+  /**
+   * @brief Получение состояния включения резервного копирования.
+   *
+   * Получение состояния включения резервного копирования.
+   * @return true, если резервное копирование включено, false в противном случае.
+   */
   inline bool enabled() const { return toggle_; }
+
+  /**
+   * @brief Получение частоты создания резервных копий.
+   *
+   * Получение частоты создания резервных копий.
+   * @return частота создания резервных копий.
+   */
   inline int frequency() const { return backup_frequency_; }
 
-  // Write backup data to file
-  // Returns true on success, false on failure
+  /**
+   * @brief Создание резервной копии.
+   *
+   * Создание резервной копии.
+   * @param sys - система, данные которой будут записаны в резервную копию.
+   * @return true, если резервная копия создана успешно, false в противном случае.
+   */
   bool createBackup(System &sys) const {
     std::ostringstream oss;
     oss << base_folder_ << "/"
@@ -30,8 +56,14 @@ public:
     cleanupBackup(sys.currentStep());
     return writeRecordsToFile(oss.str(), sys);
   }
-  // Restore data from backup file
-  // Returns true on success, false on failure
+
+  /**
+   * @brief Восстановление данных из резервной копии.
+   *
+   * Восстановление данных из резервной копии.
+   * @param sys - система, данные которой будут восстановлены из резервной копии.
+   * @return true, если данные восстановлены успешно, false в противном случае.
+   */
   bool restoreBackup(System &sys) {
     std::string input;
     std::cout << "Введите путь до файла бекапа: ";
@@ -40,6 +72,12 @@ public:
         input + "backup_" + std::to_string(backup_restore_step_) + ".bak", sys);
   };
 
+  /**
+   * @brief Получение базовой информации о резервном копировании.
+   *
+   * Получение базовой информации о резервном копировании.
+   * @return строка с информацией о резервном копировании.
+   */
   std::string getData() const {
     std::ostringstream oss;
     oss << "Backupdata"
@@ -49,6 +87,12 @@ public:
     return oss.str();
   }
 
+  /**
+   * @brief Конструктор класса BackupManager.
+   *
+   * Конструктор класса BackupManager принимает конфигурацию и настройки системы.
+   * 
+   */
   BackupManager(json config, Settings &settings) {
     base_folder_ = "data_" + std::to_string(settings.seed()) + "/backups";
     if (!std::filesystem::exists(base_folder_)) {
@@ -61,14 +105,51 @@ public:
     backup_frequency_ = config.value("frequency", 100);
     backup_restore_step_ = config.value("restore_step", 0);
   };
+  /**
+   * @brief Деструктор класса BackupManager.
+   *
+   * Деструктор класса BackupManager по умолчанию.
+   */
   ~BackupManager() = default;
 
 private:
+  /**
+   * @brief Базовый путь для резервных копий.
+   *
+   * Базовый путь для резервных копий данных системы.
+   */
   std::string base_folder_{""};
+
+  /**
+   * @brief Флаг включения резервного копирования.
+   *
+   * Флаг, указывающий, включено ли резервное копирование.
+   */
   bool toggle_{false};
+
+  /**
+   * @brief Частота создания резервных копий.
+   *
+   * Частота создания резервных копий в шагах.
+   */
   int backup_frequency_{100};
+
+  /**
+   * @brief Шаг восстановления резервной копии.
+   *
+   * Шаг, на котором будет произведено восстановление резервной копии.
+   */
   int backup_restore_step_{0};
-  // Helper to write records in binary
+
+  /**
+   * @brief Вспомогательная функция для записи записей в двоичный файл.
+   *
+   * Вспомогательная функция для записи записей в двоичный файл.
+   *
+   * @param filename Имя файла для записи.
+   * @param sys Система, данные которой будут записаны.
+   * @return true, если запись прошла успешно, false в противном случае.
+   */
   bool writeRecordsToFile(const std::string &filename, System &sys) const {
     // Open file in binary mode, std::ios::out ensures we overwrite
     std::ofstream outFile(filename, std::ios::binary | std::ios::out);
@@ -92,8 +173,8 @@ private:
     // NOTE: This assumes 'Record' is trivially copyable (POD).
     // If not, you'd serialize field by field.
     for (const Particle &p : sys.particles()) {
-      int id = p.getId();
-      double mass = p.getMass();
+      int id = p.id();
+      double mass = p.mass();
       outFile.write(reinterpret_cast<const char *>(&id), sizeof(int));
       outFile.write(reinterpret_cast<const char *>(&mass), sizeof(double));
       outFile.write(reinterpret_cast<const char *>(&p.coord()),
@@ -106,7 +187,15 @@ private:
     return true;
   }
 
-  // Helper to read records in binary
+  /**
+   * @brief Вспомогательная функция для чтения записей в двоичном формате.
+   *
+   * Вспомогательная функция для чтения записей в двоичном формате.
+   *
+   * @param filename Имя файла для чтения.
+   * @param sys Система, данные которой будут прочитаны.
+   * @return true, если чтение прошло успешно, false в противном случае.
+   */
   bool readRecordsFromFile(const std::string &filename, System &sys) {
     std::ifstream inFile(filename, std::ios::binary | std::ios::in);
     if (!inFile.is_open()) {
@@ -181,7 +270,13 @@ private:
     return true;
   }
 
-  // Delete old backups, keeping only the most recent 5
+  /**
+   * @brief Удаление старых резервных копий, оставляя только последние 5.
+   *
+   * Удаление старых резервных копий, оставляя только последние 5.
+   *
+   * @param step Шаг, на котором будет произведено удаление резервных копий.
+   */
   void cleanupBackup(int step) const {
     if (step <= 5 * backup_frequency_) {
       return; // No need to delete backups yet

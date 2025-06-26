@@ -4,25 +4,58 @@
 #include <array>
 #include <ostream>
 
+/**
+ * @brief Класс для хранения энергий системы.
+ *
+ * Класс для хранения энергий системы.
+ */
 struct Energy {
-  // Define energy types.
+  /**
+   * @brief Типы энергий.
+   *
+   * Типы энергий.
+   */
   enum EnergyType { Full, Potential, Kinetic, Thermodynamic, Internal, Count };
-  // Arrays for current energy values and their averages.
-  std::array<double, static_cast<size_t>(Count)> values{}; // Current energies
 
-  // Setter for the energy value.
+  /**
+   * @brief Значения энергий.
+   *
+   * Значения энергий.
+   */
+  std::array<double, static_cast<size_t>(Count)> values{};
+
+  /**
+   * @brief Установка значения энергии.
+   *
+   * Установка значения энергии.
+   */
   inline void set(EnergyType type, double value) {
     values[static_cast<size_t>(type)] = value;
   }
+
+  /**
+   * @brief Добавление значения энергии.
+   *
+   * Добавление значения энергии.
+   */
   inline void add(EnergyType type, double value) {
     values[static_cast<size_t>(type)] += value;
   }
-  // Getter for the energy value.
+
+  /**
+   * @brief Получение значения энергии.
+   *
+   * Получение значения энергии.
+   */
   inline double get(EnergyType type) const {
     return values[static_cast<size_t>(type)];
   }
 
-  // Overload operator<< to output the energy values.
+  /**
+   * @brief Перегрузка оператора << для вывода значений энергий.
+   *
+   * Перегрузка оператора << для вывода значений энергий.
+   */
   inline friend std::ostream &operator<<(std::ostream &os,
                                          const Energy &energy) {
     os << "Energy values:"

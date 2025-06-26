@@ -3,12 +3,42 @@
 
 #include "core/Settings.h"
 #include "core/System.h"
-#include "random_normalized.h"
+#include "helpers/random_normalized.h"
 
+/**
+ * @brief Класс для генерации скоростей частиц.
+ * @details Класс предоставляет методы для генерации скоростей частиц.
+ */
 class SpeedGenerator {
 private:
-  double sigma_maxwell_{0.0}; // Константа для распределения скоростей
+  /**
+   * @brief Константа для распределения скоростей.
+   * @details Константа для распределения скоростей.
+   */
+  double sigma_maxwell_{0.0};
+
 public:
+  SpeedGenerator() = default;
+  ~SpeedGenerator() = default;
+
+  // Запрещаем копирование
+  SpeedGenerator(const SpeedGenerator &) = delete;
+  SpeedGenerator &operator=(const SpeedGenerator &) = delete;
+
+  /**
+   * @brief Конструктор.
+   * @param settings - настройки.
+   */
+  SpeedGenerator(Settings &settings) {
+    sigma_maxwell_ = sqrt(settings.constants().KBOLTZMAN *
+                          (settings.startTemp()) / settings.mass());
+  };
+
+  /**
+   * @brief Генерация начальных скоростей.
+   * @param sys - система частиц.
+   * @param settings - настройки.
+   */
   void startingSpeeds(System &sys, Settings &settings) {
     int pn = sys.particleNumber();
     std::vector<Particle> &particles = sys.particles();
@@ -21,17 +51,6 @@ public:
       particles[i + pn / 2].setVelocity(-1 * speed);
     }
   }
-  SpeedGenerator() = default;
-  SpeedGenerator(Settings &settings) {
-    sigma_maxwell_ = sqrt(settings.constants().KBOLTZMAN *
-                          (settings.startTemp()) / settings.mass());
-  };
-  ;
-  ~SpeedGenerator() = default;
-
-  // Запрещаем копирование
-  SpeedGenerator(const SpeedGenerator &) = delete;
-  SpeedGenerator &operator=(const SpeedGenerator &) = delete;
 };
 
 #endif

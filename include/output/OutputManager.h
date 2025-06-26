@@ -19,15 +19,38 @@ using json = nlohmann::json;
 class Ensemble;
 class EnsembleManager;
 
+/**
+ * @brief Класс для управления выходными данными.
+ * @details Класс предоставляет методы для записи данных в файлы и потоки.
+ */
 class OutputManager {
 private:
+  /**
+   * @brief Путь к основной директории.
+   */
   std::string output_dir_;
+
+  /**
+   * @brief Путь к директории с шагами.
+   */
   std::string step_dir_;
+
+  /**
+   * @brief Путь к директории с ансамблями.
+   */
   std::string ens_dir_;
 
+  /**
+   * @brief Частота записи данных.
+   */
   int frequency_;
 
 public:
+  /**
+   * @brief Конструктор.
+   * @param config - конфигурация.
+   * @param settings - настройки.
+   */
   OutputManager(const json &config, Settings &settings) {
     output_dir_ = config.value("main_directory", "data") + "_" +
                   std::to_string(settings.seed());
@@ -56,7 +79,15 @@ public:
   inline const std::string &getStepDir() const { return step_dir_; }
   inline const std::string &getOutputDir() const { return output_dir_; }
 
-  // Version for writing to a filename
+  /**
+   * @brief Запись данных в файл.
+   * @param filename - имя файла.
+   * @param headers - заголовки.
+   * @param data - данные.
+   * @param append - флаг добавления данных.
+   * @param delimiter - разделитель.
+   * @param precision - точность.
+   */
   template <typename T>
   void writeDataToFile(const std::string &filename,
                        const std::vector<std::string> &headers,
@@ -73,7 +104,15 @@ public:
                   precision);
   }
 
-  // Version for writing to an existing ofstream
+  /**
+   * @brief Запись данных в поток.
+   * @param stream - поток.
+   * @param headers - заголовки.
+   * @param data - данные.
+   * @param write_headers - флаг записи заголовков.
+   * @param delimiter - разделитель.
+   * @param precision - точность.
+   */
   template <typename T>
   void writeDataToStream(std::ofstream &stream,
                          const std::vector<std::string> &headers,
@@ -84,10 +123,17 @@ public:
     writeToStream(stream, headers, data, write_headers, delimiter, precision);
   }
 
-  // Common implementation used by both versions
+  /**
+   * @brief Запись данных в поток.
+   * @param stream - поток.
+   * @param headers - заголовки.
+   * @param data - данные.
+   * @param write_headers - флаг записи заголовков.
+   * @param delimiter - разделитель.
+   * @param precision - точность.
+   */
   template <typename T, typename StreamType>
-  void
-  writeToStream(StreamType &stream, const std::vector<std::string> &headers,
+  void writeToStream(StreamType &stream, const std::vector<std::string> &headers,
                 const std::vector<std::vector<T>> &data, bool write_headers,
                 const std::string &delimiter, int precision) const {
     // Set precision for floating point numbers
@@ -116,7 +162,15 @@ public:
     }
   }
 
-  // Convenience functions for single row
+  /**
+   * @brief Запись строки в файл.
+   * @param filename - имя файла.
+   * @param headers - заголовки.
+   * @param row - строка.
+   * @param append - флаг добавления данных.
+   * @param delimiter - разделитель.
+   * @param precision - точность.
+   */
   template <typename T>
   void writeRowToFile(const std::string &filename,
                       const std::vector<std::string> &headers,
@@ -127,6 +181,15 @@ public:
     writeDataToFile(filename, headers, data, append, delimiter, precision);
   }
 
+  /**
+   * @brief Запись строки в поток.
+   * @param stream - поток.
+   * @param headers - заголовки.
+   * @param row - строка.
+   * @param write_headers - флаг записи заголовков.
+   * @param delimiter - разделитель.
+   * @param precision - точность.
+   */
   template <typename T>
   void writeRowToStream(std::ofstream &stream,
                         const std::vector<std::string> &headers,
@@ -138,14 +201,21 @@ public:
                       precision);
   }
 
+  /**
+   * @brief Запись конфигурации расчетов в файл.
+   * @param config - конфигурация.
+   */
   void writeModellingProperties(json &config) const {
     std::string filename = output_dir_ + "/launch_config.json";
     std::ofstream file(filename, std::ios::app);
     file << config.dump(4) << std::endl;
     file.close();
   }
-  // Write accumulated properties (temperature, pressure, energies, pulse) over
-  // steps
+
+  /**
+   * @brief Запись свойств системы в файл.
+   * @param sys - система.
+   */
   void writeSystemProperties(System &sys) const {
     std::string filename = output_dir_ + "/properties.csv";
 
@@ -165,6 +235,10 @@ public:
     writeRowToFile(filename, headers, data, true);
   }
 
+  /**
+   * @brief Запись средних свойств системы в файл.
+   * @param sys - система.
+   */
   void writeAvgSystemProperties(System &sys) const {
     std::string filename = output_dir_ + "/properties_avg.csv";
 
@@ -183,7 +257,11 @@ public:
 
     writeRowToFile(filename, headers, data, true);
   }
-  // Create a directory for each step and write particle data
+
+  /**
+   * @brief Запись пошаговых данных о частицах в файл.
+   * @param sys - система.
+   */
   void writeStepData(System &sys) const {
     std::string filename = step_dir_ + "/step_" +
                            std::to_string(sys.currentStep()) + "_particles.csv";
@@ -197,7 +275,7 @@ public:
     int id = 0;
 
     for (const auto &particle : sys.particles()) {
-      const auto &id = particle.getId();
+      const auto &id = particle.id();
       const auto &coord = particle.coord();
       const auto &velocity = particle.velocity();
       const auto &force = particle.force();
@@ -226,6 +304,10 @@ public:
     writeDataToFile(filename, headers, data);
   }
 
+  /**
+   * @brief Получение базовой информации о выходном менеджере.
+   * @return Базовая информация о выходном менеджере.
+   */
   const std::string getData() const {
     std::ostringstream oss;
     oss << "Output manager data:"

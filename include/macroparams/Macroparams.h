@@ -27,25 +27,25 @@ public:
     Matrix3 sumMV{};
     Matrix3 sumVirials{};
     for (Particle &p : sys.particles()) {
-      sumMV.xx() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
+      sumMV.xx() += p.mass() * (p.velocity().x() - sys.vcm().x()) *
                     (p.velocity().x() - sys.vcm().x()); // xx
-      sumMV.xy() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
+      sumMV.xy() += p.mass() * (p.velocity().x() - sys.vcm().x()) *
                     (p.velocity().y() - sys.vcm().y()); // xy
-      sumMV.xz() += p.getMass() * (p.velocity().x() - sys.vcm().x()) *
+      sumMV.xz() += p.mass() * (p.velocity().x() - sys.vcm().x()) *
                     (p.velocity().z() - sys.vcm().z()); // xz
 
-      sumMV.yx() += p.getMass() * (p.velocity().y() - sys.vcm().y()) *
+      sumMV.yx() += p.mass() * (p.velocity().y() - sys.vcm().y()) *
                     (p.velocity().x() - sys.vcm().x()); // yx
-      sumMV.yy() += p.getMass() * (p.velocity().y() - sys.vcm().y()) *
+      sumMV.yy() += p.mass() * (p.velocity().y() - sys.vcm().y()) *
                     (p.velocity().y() - sys.vcm().y()); // yy
-      sumMV.yz() += p.getMass() * (p.velocity().y() - sys.vcm().y()) *
+      sumMV.yz() += p.mass() * (p.velocity().y() - sys.vcm().y()) *
                     (p.velocity().z() - sys.vcm().z()); // yz
 
-      sumMV.zx() += p.getMass() * (p.velocity().z() - sys.vcm().z()) *
+      sumMV.zx() += p.mass() * (p.velocity().z() - sys.vcm().z()) *
                     (p.velocity().x() - sys.vcm().x()); // zx
-      sumMV.zy() += p.getMass() * (p.velocity().z() - sys.vcm().z()) *
+      sumMV.zy() += p.mass() * (p.velocity().z() - sys.vcm().z()) *
                     (p.velocity().y() - sys.vcm().y()); // zy
-      sumMV.zz() += p.getMass() * (p.velocity().z() - sys.vcm().z()) *
+      sumMV.zz() += p.mass() * (p.velocity().z() - sys.vcm().z()) *
                     (p.velocity().z() - sys.vcm().z()); // zz
 
       sumVirials.xx() += p.virials().xx();

@@ -15,32 +15,35 @@
 #include "potentials/Potential.h"
 
 /**
- * @class ForceAlgorithm
- * @brief Handles calculation of forces between particles using different
- * potential models.
- *
- * This class encapsulates the logic for computing forces, potential energies,
- * and other related values between particles in a molecular dynamics
- * simulation. It supports different potential types including LJ and
- * EAM.
+ * @brief Класс для вычисления сил между частицами.
+ * @details Класс предоставляет методы для вычисления сил между частицами и
+ * применения периодических граничных условий.
  */
 class ForceAlgorithm {
 private:
-  Settings &settings_; /**< Reference to simulation settings */
-  Dimensions &dim_;    /**< Reference to system dimensions */
-  std::unique_ptr<Potential> potential_; /**< Pointer to the potential model */
+  /**
+   * @brief Настройки.
+   */
+  Settings &settings_;
 
   /**
-   * @brief Applies mirroring conditions to a vector.
-   *
-   * Adjusts vector components to account for periodic boundary conditions
-   * in all three dimensions.
-   *
-   * @param vec Vector to be adjusted
-   * @param lx System length in x dimension
-   * @param ly System length in y dimension
-   * @param lz System length in z dimension
-   * @return Adjusted vector
+   * @brief Размеры системы.
+   */
+  Dimensions &dim_;
+
+  /**
+   * @brief Модель потенциала.
+   */
+  std::unique_ptr<Potential> potential_;
+
+  /**
+   * @brief Отражение вектора.
+   * @details Отражает вектор, учитывая периодические граничные условия.
+   * @param vec - вектор.
+   * @param lx - длина системы в x-ой размерности.
+   * @param ly - длина системы в y-ой размерности.
+   * @param lz - длина системы в z-ой размерности.
+   * @return Отраженный вектор.
    */
   inline Vector3<double> mirror_vector(Vector3<double> &vec, double lx,
                                        double ly, double lz) {
@@ -67,18 +70,20 @@ private:
 
 public:
   /**
-   * @brief Computes force and related values between two particles.
-   *
-   * Calculates the force, potential energy, and virials between two particles
-   * based on the configured potential model and system settings.
-   *
-   * @param p1 First particle
-   * @param p2 Second particle
-   * @return Calculation results including force, potential energy, etc.
+   * @brief Вычисление потенциальной энергии для EAM потенциала.
+   * @param p1 - первая частица.
+   * @return Потенциальная энергия.
    */
   inline double PotentialEnergy_EAM(Particle &p1) {
     return potential_->getU(p1.electron_density(), p1.pairPotential());
   }
+
+  /**
+   * @brief Вычисление силы между двумя частицами.
+   * @param p1 - первая частица.
+   * @param p2 - вторая частица.
+   * @return Результат вычисления силы.
+   */
   inline ForceCalcValues compute(Particle &p1, Particle &p2) {
     ForceCalcValues output;
     Vector3<double> rVec = p1.coord() - p2.coord();
@@ -100,7 +105,7 @@ public:
     double U = 0.0;
     double FU = 0.0;
     switch (potential_->getPotentialType()) {
-    case Potential::PotentialType::LJ: {
+    case PotentialType::LJ: {
       PotentialResult res = potential_->getAll(lengthSqr);
       // U = potential_->getU(lengthSqr);
       // FU = potential_->getFU(lengthSqr);
@@ -108,7 +113,7 @@ public:
       FU = res.fu;
       break;
     }
-    case Potential::PotentialType::EAM: {
+    case PotentialType::EAM: {
       // U = potential_->getU(p1.electron_density(), p1.pairPotential());
       FU = potential_->getFU(p1.electron_density(), p2.electron_density(),
                              length);
@@ -128,13 +133,9 @@ public:
   }
 
   /**
-   * @brief Performs pre-computation for EAM potential.
-   *
-   * Calculates and stores intermediate values needed for EAM potential
-   * calculations.
-   *
-   * @param p1 First particle
-   * @param p2 Second particle
+   * @brief Предвычисление для EAM потенциала.
+   * @param p1 - первая частица.
+   * @param p2 - вторая частица.
    */
   inline void preCompute(Particle &p1, Particle &p2) {
     Vector3<double> rVec = p1.coord() - p2.coord();
@@ -151,50 +152,57 @@ public:
       return;
     double length = rVec.length();
 
-    double mu = potential_->getPairPart(length);
-    double rho_f = potential_->getDensityPart(length);
+    Mu_RhoF mu_rho_f = potential_->getPairDesityPart(length);
 
-    p1.addElectronDensity(rho_f);
-    p1.addPairPotential(mu);
+    p1.addElectronDensity(mu_rho_f.rho_f);
+    p1.addPairPotential(mu_rho_f.mu);
   }
+
   /**
-   * @brief Returns the cutoff distance for the potential.
-   * @return Cutoff distance
+   * @brief Получение радиуса обрезания.
+   * @return Радиус обрезания.
    */
   inline const double getCutOff() const { return potential_->getRcut(); }
 
   /**
-   * @brief Returns the type of the potential being used.
-   * @return Potential type
+   * @brief Получение типа потенциала.
+   * @return Тип потенциала.
    */
-  inline const Potential::PotentialType getPotentialType() const {
+  inline const PotentialType getPotentialType() const {
     return potential_->getPotentialType();
   }
 
   inline const double callCloudCalc(double rho) const {
     return potential_->getCloud(rho);
   }
+
   inline const double callDerCloudCalc(double rho) const {
     return potential_->getDerCloud(rho);
   }
+
   /**
-   * @brief Constructs a ForceAlgorithm with specified settings and potential.
-   *
-   * @param settings Reference to simulation settings
-   * @param potential Unique pointer to a potential model
-   * @param sys Reference to the particle system
+   * @brief Конструктор.
+   * @param settings - настройки.
+   * @param potential - модель потенциала.
+   * @param sys - система частиц.
    */
   ForceAlgorithm(Settings &settings, std::unique_ptr<Potential> &&potential,
                  System &sys)
       : settings_(settings), potential_(std::move(potential)),
         dim_(sys.dimensions()) {}
-  /** @brief Default constructor is deleted */
+
+  /**
+   * @brief Конструктор по умолчанию.
+   */
   inline ForceAlgorithm() = delete;
-  /** @brief Default destructor */
+
+  /**
+   * @brief Деструктор.
+   */
   ~ForceAlgorithm() = default;
-  /** @brief Copy constructor is deleted */
+
+  // Запрещаем копирование
   ForceAlgorithm(const ForceAlgorithm &) = delete;
-  /** @brief Assignment operator is deleted */
   ForceAlgorithm &operator=(const ForceAlgorithm &) = delete;
 };
 #endif // FORCE_ALGORITHM_H

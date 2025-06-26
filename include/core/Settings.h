@@ -6,34 +6,101 @@
 
 using json = nlohmann::json;
 
+/**
+ * @brief Константы.
+ * @details Константы для расчета.
+ */
 struct Constants {
   const double D{3};                   // Число степеней свободы
   const double KBOLTZMAN{1.380648528}; // Постоянная Больцмана
 };
 
-struct Settings {
-public:
+/**
+ * @brief Класс для работы с настройками расчета.
+ * @details Класс предоставляет методы для работы с настройками расчета.
+ */
+class Settings {
 private:
+  /**
+   * @brief Константы.
+   */
   Constants constants_;
+
+  /**
+   * @brief Сид.
+   */
   int seed_{0};
-  //"Settings"
+
+  /**
+   * @brief Число потоков.
+   */
   int threads_{0};
+
+  /**
+   * @brief Флаг отладки.
+   */
   bool debug_{false};
+
+  /**
+   * @brief Флаг профилирования.
+   */
   bool profiling_{false};
+
+  /**
+   * @brief Флаг периодических граничных условий.
+   */
   bool pbc_{false};
+
+  /**
+   * @brief Число шагов.
+   */
   int nsteps_{0};
+
+  /**
+   * @brief Шаг по времени.
+   */
   double delta_t_{0.0};
+
+  /**
+   * @brief Начальная температура.
+   */
   double start_temp_{0.0};
-  //"Material"
+
+  /**
+   * @brief Название материала.
+   */
   std::string material_name_{"Undefined"};
+
+  /**
+   * @brief Тип структуры материала.
+   */
   std::string struct_type_{"Undefined"};
+
+  /**
+   * @brief Пользовательская структура материала.
+   */
   json custom_layout_;
+
+  /**
+   * @brief Масса материала.
+   */
   double mass_{0.0};
 
+  
 public:
+  
   Settings() = default;
-  Settings(json &config) {
+  ~Settings() = default;
 
+  // Запрещаем копирование
+  Settings(const Settings &) = delete;
+  Settings &operator=(const Settings &) = delete;
+
+  /**
+   * @brief Конструктор.
+   * @details Конструктор класса Settings.
+   */
+  Settings(json &config) {
     if (!config.contains("settings"))
       throw std::invalid_argument("В файле конфигурации нет настроек системы");
     json settings = config["settings"];
@@ -86,12 +153,7 @@ public:
     srand(time(0));
     seed_ = rand();
   };
-  ~Settings() = default;
-
-  // Запрещаем копирование
-  Settings(const Settings &) = delete;
-  Settings &operator=(const Settings &) = delete;
-
+  
   // Getter and Setter for threads
   inline const int threads() const { return threads_; }
   inline void setThreads(int t) { threads_ = t; }
@@ -140,7 +202,10 @@ public:
 
   inline const json customLayout() const { return custom_layout_; }
 
-  // Методы
+  /**
+   * @brief Получение базовой информации о настройках.
+   * @return Базовая информация о настройках.
+   */
   std::string getData() const {
     std::ostringstream oss;
     oss.precision(16);

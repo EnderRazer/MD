@@ -9,7 +9,7 @@
 
 #include "nlohmann/json.hpp"
 
-#include "classes/IncrementalIntegrator.h" //Интегральная функция
+#include "helpers/IncrementalIntegrator.h" //Интегральная функция
 #include "classes/Matrix3.h"
 #include "classes/ThreadPool.h"
 #include "classes/Vector3.h"
@@ -19,48 +19,199 @@
 #include "macroparams/GreenKubo.h"
 #include "output/OutputManager.h"
 
+/**
+ * @brief Структура для хранения ансамбля.
+ *
+ * Структура для хранения ансамбля.
+ */
 struct Ensemble {
-  int id_;  // Идентификатор ансамбля
-  int cur_; // Внутренний счетчик ансамбля
+  /**
+   * @brief Идентификатор ансамбля.
+   *
+   * Идентификатор ансамбля.
+   */
+  int id_;
 
-  std::string filename_;      // Имя файла для записи данных ансамбля
-  std::ofstream output_file_; // Файл для записи данных ансамбля
+  /**
+   * @brief Внутренний счетчик ансамбля.
+   *
+   * Внутренний счетчик ансамбля.
+   */
+  int cur_;
 
-  std::vector<Vector3<double>>          // Начальные компоненты скорости
-      init_velocity_{{0.0, 0.0, 0.0}};  // (для расчетов коэффициента диффузии)
-  std::vector<double> accum_acfv_{0.0}; // Автокорреляционные функции скорости
-  std::vector<double> coef_diff_integral_{0.0}; // Интеграл от АКФ
+  /**
+   * @brief Имя файла для записи данных ансамбля.
+   *
+   * Имя файла для записи данных ансамбля.
+   */
+  std::string filename_;
 
-  Matrix3 init_pressure_tensors_{0.0}; // Начальные тензоры давления системы
-  std::vector<double> accum_acfp_{
-      0.0}; // Автокорреляционные функции тензоров давления
-  std::vector<double> coef_visc_integral_{0.0}; // Интеграл от АКФ
+  /**
+   * @brief Файл для записи данных ансамбля.
+   *
+   * Файл для записи данных ансамбля.
+   */
+  std::ofstream output_file_;
+
+  /**
+   * @brief Начальные компоненты скорости.
+   *
+   * Начальные компоненты скорости.
+   */
+  std::vector<Vector3<double>> init_velocity_{{0.0, 0.0, 0.0}};
+
+  /**
+   * @brief Автокорреляционные функции скорости.
+   *
+   * Автокорреляционные функции скорости.
+   */
+  std::vector<double> accum_acfv_{0.0};
+
+  /**
+   * @brief Интеграл от АКФ для коэффициента диффузии.
+   *
+   * Интеграл от АКФ для коэффициента диффузии.
+   */
+  std::vector<double> coef_diff_integral_{0.0};
+
+  /**
+   * @brief Начальные тензоры давления системы.
+   *
+   * Начальные тензоры давления системы.
+   */
+  Matrix3 init_pressure_tensors_{0.0};
+
+  /**
+   * @brief Автокорреляционные функции тензоров давления.
+   */
+  std::vector<double> accum_acfp_{0.0};
+
+  /**
+   * @brief Интеграл от АКФ для коэффициента вязкости.
+   *
+   * Интеграл от АКФ для коэффициента вязкости.
+   */
+  std::vector<double> coef_visc_integral_{0.0};
 };
 
 using json = nlohmann::json;
 
+/**
+ * @brief Класс для управления ансамблями.
+ *
+ * Класс для управления ансамблями.
+ */
 class EnsembleManager {
 private:
-  ThreadPool &threadPool_;       // Пул потоков для параллельных вычислений
-  OutputManager &outputManager_; // Менеджер вывода данных
+  /**
+   * @brief Пул потоков для параллельных вычислений.
+   *
+   * Пул потоков для параллельных вычислений.
+   */
+  ThreadPool &threadPool_;
 
-  IncrementalIntegrator integral_diff_; // Интеграл от АКФ
-  IncrementalIntegrator integral_visc_; // Интеграл от АКФ
-  GreenKubo gk; // Методы Грин-Кубо для транспортных коэффициентов
+  /**
+   * @brief Менеджер вывода данных.
+   *
+   * Менеджер вывода данных.
+   */
+  OutputManager &outputManager_;
 
+  /**
+   * @brief Интеграл от АКФ для коэффициента диффузии.
+   *
+   * Интеграл от АКФ для коэффициента диффузии.
+   */
+  IncrementalIntegrator integral_diff_;
+
+  /**
+   * @brief Интеграл от АКФ для коэффициента вязкости.
+   *
+   * Интеграл от АКФ для коэффициента вязкости.
+   */
+  IncrementalIntegrator integral_visc_;
+
+  /**
+   * @brief Методы Грин-Кубо для транспортных коэффициентов.
+   *
+   * Методы Грин-Кубо для транспортных коэффициентов.
+   */
+  GreenKubo gk;
+
+  /**
+   * @brief Флаг включения ансамблей.
+   *
+   * Флаг включения ансамблей.
+   */
   bool toggle_{false};
-  bool finished_{false}; // Флаг завершения работы
-  int nsteps_{0};        // Количество шагов
 
-  int ensemble_threads_num_; // Количество параллельных "потоков" ансамблей
-  int ensemble_size_;        // Размер ансамбля (кол-во шагов)
-  int ensemble_offset_;      // Отступ между ансамблями
-  int ensemble_count_;       // Сколько всего полных ансамблей собирать
+  /**
+   * @brief Флаг завершения расчетов.
+   *
+   * Флаг завершения расчетов.
+   */
+  bool finished_{false};
 
+  /**
+   * @brief Количество шагов.
+   *
+   * Количество шагов.
+   */
+  int nsteps_{0};
+
+  /**
+   * @brief Количество параллельных "потоков" ансамблей.
+   *
+   * Количество параллельных "потоков" ансамблей.
+   */
+  int ensemble_threads_num_;
+
+  /**
+   * @brief Размер ансамбля (кол-во шагов).
+   *
+   * Размер ансамбля (кол-во шагов).
+   */
+  int ensemble_size_;
+
+  /**
+   * @brief "Отступ" между ансамблями.
+   *
+   * "Отступ" между ансамблями.
+   */
+  int ensemble_offset_;
+
+  /**
+   * @brief Сколько всего полных ансамблей собирать.
+   *
+   * Сколько всего полных ансамблей собирать.
+   */
+  int ensemble_count_;
+
+  /**
+   * @brief Текущее количество ансамблей.
+   *
+   * Текущее количество ансамблей.
+   */
   int current_ens_count{0};
-  std::vector<Ensemble> ensembles_; // Вектор ансамблей
-  Ensemble avg_ensemble_;           // Сборник ансамблей
 
+  /**
+   * @brief Вектор ансамблей.
+   *
+   * Вектор ансамблей.
+   */
+  std::vector<Ensemble> ensembles_;
+
+  /**
+   * @brief Сборник ансамблей.
+   */
+  Ensemble avg_ensemble_;
+
+  /**
+   * @brief Очистка ансамбля.
+   *
+   * Очистка ансамбля.
+   * @param ens - ансамбль.
+   */
   inline void flushEnsemble(Ensemble &ens) {
     ens.cur_ = 0;
     for (int i = 0; i < ensemble_size_; i++) {
@@ -79,6 +230,14 @@ private:
     ens.output_file_.close();
   };
 
+  /**
+   * @brief Инициализация ансамбля.
+   *
+   * Инициализация ансамбля.
+   * @param thread_finished_count - количество завершенных потоков.
+   * @param ens - ансамбль.
+   * @param sys - система.
+   */
   inline void initEnsemble(int thread_finished_count, Ensemble &ens,
                            System &sys) {
     if (current_ens_count > 0)
@@ -91,7 +250,7 @@ private:
     // забирать ресурсы
     // Или уже рассчитано нужное количество ансамблей
     if (sys.currentStep() + ensemble_size_ > nsteps_) {
-      ens.cur_ = -INT32_MAX; // Просто очень большое отрицательное число до
+      ens.cur_ = INT32_MIN; // Просто очень большое отрицательное число до
                              // которого не дойдем
       return;
     }
@@ -106,6 +265,12 @@ private:
         outputManager_.getEnsembleDir() + "/" + ens.filename_, std::ios::app);
   }
 
+  /**
+   * @brief Запись детальных данных ансамбля в файл.
+   *
+   * Запись детальных данных ансамбля в файл.
+   * @param ens - ансамбль.
+   */
   void writeEnsembleDetailed(Ensemble &ens) const {
     std::vector<std::string> headers = {"Step", "ACFV", "CDiff", "ACFP",
                                         "CVisc"};
@@ -121,6 +286,12 @@ private:
                                     writeHeaders);
   }
 
+  /**
+   * @brief Запись усредненных данных ансамблей в файл.
+   *
+   * Запись усредненных данных ансамблей в файл.
+   * @param avg_ensemble - усредненный ансамбль.
+   */
   void writeAvgEnsembleDetailed(Ensemble &avg_ensemble) const {
     std::vector<std::string> headers = {"Step", "ACFV", "CDiff", "ACFP",
                                         "CVisc"};
@@ -141,6 +312,16 @@ private:
   }
 
 public:
+  /**
+   * @brief Конструктор класса EnsembleManager.
+   *
+   * Конструктор класса EnsembleManager.
+   * @param config - конфигурация.
+   * @param settings - настройки.
+   * @param sys - система.
+   * @param threadPool - пул потоков.
+   * @param outputManager - менеджер вывода данных.
+   */
   EnsembleManager(json &config, Settings &settings, System &sys,
                   ThreadPool &threadPool, OutputManager &outputManager)
       : integral_diff_(settings.dt()), integral_visc_(settings.dt()),
@@ -187,33 +368,124 @@ public:
       }
     }
   };
-  // Запрещаем копирование
-  EnsembleManager(const EnsembleManager &) = delete;
-  EnsembleManager &operator=(const EnsembleManager &) = delete;
 
+  /**
+   * @brief Деструктор по умолчанию.
+   *
+   * Деструктор по умолчанию.
+   */
   ~EnsembleManager() = default;
 
+  /**
+   * @brief Проверка включения ансамблей.
+   *
+   * Проверка включения ансамблей.
+   * @return true - ансамбли включены, false - ансамбли выключены.
+   */
   inline const bool enabled() const { return toggle_; }
+
+  /**
+   * @brief Проверка завершения расчетов.
+   *
+   * Проверка завершения расчетов.
+   * @return true - расчеты завершены, false - расчеты не завершены.
+   */
   inline const bool completed() const { return finished_; };
 
+  /**
+   * @brief Получение количества параллельных потоков ансамблей.
+   *
+   * Получение количества параллельных потоков ансамблей.
+   * @return количество параллельных потоков ансамблей.
+   */
   int getEnsembleThreadsNum() const { return ensemble_threads_num_; }
+
+  /**
+   * @brief Получение размера ансамбля.
+   *
+   * Получение размера ансамбля.
+   * @return размер ансамбля.
+   */
   int getEnsembleSize() const { return ensemble_size_; }
+  
+  /**
+   * @brief Получение "отступа" между ансамблями.
+   *
+   * Получение "отступа" между ансамблями.
+   * @return "отступ" между ансамблями.
+   */
   int getEnsembleOffset() const { return ensemble_offset_; }
+
+  /**
+   * @brief Получение количества ансамблей.
+   *
+   * Получение количества ансамблей.
+   * @return количество ансамблей.
+   */
   int getEnsembleCount() const { return ensemble_count_; }
+
+  /**
+   * @brief Получение завершенного количества ансамблей.
+   *
+   * Получение завершенного количества ансамблей.
+   * @return завершенное количество ансамблей.
+   */
   int getCurrentEnsCount() const { return current_ens_count; }
+  
+  /**
+   * @brief Получение вектора ансамблей.
+   *
+   * Получение вектора ансамблей.
+   * @return вектор ансамблей.
+   */
   const std::vector<Ensemble> &getEnsembles() const { return ensembles_; }
+  
+  /**
+   * @brief Получение вектора усредненных значений АКФ скорости.
+   *
+   * Получение вектора усредненных значений АКФ скорости.
+   * @return вектор усредненных значений АКФ скорости.
+   */
   const std::vector<double> &getEnsemblesAccumAcfv() const {
     return avg_ensemble_.accum_acfv_;
   }
+
+  /**
+   * @brief Получение вектора усредненных значений АКФ давления.
+   *
+   * Получение вектора усредненных значений АКФ давления.
+   * @return вектор усредненных значений АКФ давления.
+   */
   const std::vector<double> &getEnsemblesAccumAcfp() const {
     return avg_ensemble_.accum_acfp_;
   }
+
+  /**
+   * @brief Получение вектора усредненных значений интеграла от АКФ для коэффициента диффузии.
+   *
+   * Получение вектора усредненных значений интеграла от АКФ для коэффициента диффузии.
+   * @return вектор усредненных значений интеграла от АКФ для коэффициента диффузии.
+   */
   const std::vector<double> &getEnsemblesCoefDiffIntegral() const {
     return avg_ensemble_.coef_diff_integral_;
   }
+
+  /**
+   * @brief Получение вектора усредненных значений интеграла от АКФ для коэффициента вязкости.
+   *
+   * Получение вектора усредненных значений интеграла от АКФ для коэффициента вязкости.
+   * @return вектор усредненных значений интеграла от АКФ для коэффициента вязкости.
+   */
   const std::vector<double> &getEnsemblesCoefViscIntegral() const {
     return avg_ensemble_.coef_visc_integral_;
   }
+
+  /**
+   * @brief Получение базовой информации о менеджере ансамблей.
+   *
+   * Получение базовой информации о менеджере ансамблей.
+   * @return строка с информацией о менеджере ансамблей.
+   */
   std::string getData() const {
     std::ostringstream oss;
     oss << "Using ensembles to calculate transport coefficients"
@@ -239,6 +511,12 @@ public:
     return oss.str();
   }
 
+  /**
+   * @brief Расчет транспортных коэффициентов методом Грин-Кубо.
+   *
+   * Расчет транспортных коэффициентов методом Грин-Кубо.
+   * @param sys - система.
+   */
   void accumulateGreenCubo(System &sys) {
     if (current_ens_count < ensemble_count_) {
       const int blockSize =
@@ -309,7 +587,11 @@ public:
       }
       writeAvgEnsembleDetailed(avg_ensemble_);
     }
-  };
+  }
+
+  // Запрещаем копирование
+  EnsembleManager(const EnsembleManager &) = delete;
+  EnsembleManager &operator=(const EnsembleManager &) = delete;
 };
 
 #endif

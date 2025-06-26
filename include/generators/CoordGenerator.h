@@ -5,13 +5,29 @@
 #include "core/Settings.h"
 #include "core/System.h"
 
+/**
+ * @brief Структура для хранения пользовательской структуры материала.
+ * @details Структура для хранения пользовательской структуры материала.
+ */
 struct CustomLayout {
   Vector3<double> coords;
   Vector3<double> velocities;
 };
 
+/**
+ * @brief Класс для генерации координат частиц.
+ * @details Класс предоставляет методы для генерации координат частиц.
+ */
 class CoordinatesGenerator {
 private:
+  /**
+   * @brief Генерация решетки.
+   * @param count - счетчик частиц.
+   * @param sys - система частиц.
+   * @param settings - настройки.
+   * @param limit - ограничения.
+   * @param offset - смещение.
+   */
   void generateLattice(int &count, System &sys, Settings &settings,
                        const Vector3<int> &limit,
                        const Vector3<double> &offset = {0, 0, 0}) {
@@ -27,6 +43,11 @@ private:
     }
   }
 
+  /**
+   * @brief Генерация куба.
+   * @param sys - система частиц.
+   * @param settings - настройки.
+   */
   void generatePrimitiveCube(System &sys, Settings &settings) {
     Vector3<int> limit = settings.hasPbc() ? sys.dimensions().numCrists()
                                            : sys.dimensions().numCrists() + 1;
@@ -34,6 +55,12 @@ private:
     generateLattice(count, sys, settings, limit);
     assert(count == sys.particleNumber() && "Particle number mismatch");
   }
+
+  /**
+   * @brief Генерация FCC структуры.
+   * @param sys - система частиц.
+   * @param settings - настройки.
+   */
   void generateFCC(System &sys, Settings &settings) {
     Vector3<int> offset = sys.dimensions().numVoid();
     Vector3<int> limit = settings.hasPbc() ? sys.dimensions().numCrists()
@@ -64,6 +91,11 @@ private:
     assert(count == sys.particleNumber() && "Particle number mismatch");
   }
 
+  /**
+   * @brief Генерация пользовательской структуры.
+   * @param sys - система частиц.
+   * @param settings - настройки.
+   */
   void generateCustom(System &sys, Settings &settings) {
     json custom = settings.customLayout();
     std::cout << custom << std::endl;
@@ -87,9 +119,18 @@ private:
   }
 
 public:
-  CoordinatesGenerator(/* args */) = default;
+  CoordinatesGenerator() = default;
   ~CoordinatesGenerator() = default;
 
+  // Запрещаем копирование
+  CoordinatesGenerator(const CoordinatesGenerator &) = delete;
+  CoordinatesGenerator &operator=(const CoordinatesGenerator &) = delete;
+
+  /**
+   * @brief Генерация начальных координат.
+   * @param sys - система частиц.
+   * @param settings - настройки.
+   */
   void startingCoords(System &sys, Settings &settings) {
     if (settings.structType() == std::string("CP")) {
       std::cout << "Generating CP structure" << std::endl;
@@ -105,9 +146,6 @@ public:
                                settings.structType());
     }
   }
-  // Запрещаем копирование
-  CoordinatesGenerator(const CoordinatesGenerator &) = delete;
-  CoordinatesGenerator &operator=(const CoordinatesGenerator &) = delete;
 };
 
 #endif

@@ -16,7 +16,7 @@
 #include "classes/EnsembleManager.h"
 #include "classes/Particle.h"
 #include "classes/ThreadPool.h"
-#include "classes/Timer.h"
+#include "helpers/Timer.h"
 #include "macroparams/Macroparams.h"
 #include "output/OutputManager.h"
 #include "potentials/Potential.h"
@@ -24,25 +24,79 @@
 
 using json = nlohmann::json;
 
+/**
+ * @brief Класс для работы с алгоритмами молекулярной динамики.
+ * @details Класс предоставляет методы для работы с алгоритмами молекулярной
+ * динамики.
+ */
 class MDAlgorithms {
 private:
+  /**
+   * @brief Таймер для измерения времени выполнения.
+   */
   Timer timer_{1};
+
+  /**
+   * @brief Настройки.
+   */
   Settings &settings_;
+
+  /**
+   * @brief Пул потоков.
+   */
   ThreadPool &threadPool_;
 
+  /**
+   * @brief Менеджер бекапов.
+   */
   BackupManager &backupManager_;
+
+  /**
+   * @brief Менеджер вывода.
+   */
   OutputManager &outputManager_;
 
+  /**
+   * @brief Менеджер ансамблей.
+   */
   std::unique_ptr<EnsembleManager> ensemble_manager_;
+
+  /**
+   * @brief Термостат.
+   */
   std::unique_ptr<Thermostat> thermostat_;
+
+  /**
+   * @brief Баростат.
+   */
   std::unique_ptr<Barostat> barostat_;
 
+  /**
+   * @brief Алгоритмы расчета сил.
+   */
   ForceAlgorithm force_;
+
+  /**
+   * @brief Алгоритмы расчета координат.
+   */
   CoordinateAlgorithm coords_;
+
+  /**
+   * @brief Алгоритмы расчета скоростей.
+   */
   VelocityAlgorithm vels_;
+
+  /**
+   * @brief Макропараметры.
+   */
   Macroparams macroparams_;
 
 public:
+  /**
+   * @brief Расчет координат.
+   * @param sys_ - система частиц.
+   * @details Расчет координат частиц.
+   */
   void CalculateCoordinates(System &sys_) {
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
@@ -69,6 +123,11 @@ public:
     }
   }
 
+  /**
+   * @brief Расчет скоростей.
+   * @param sys_ - система частиц.
+   * @details Расчет скоростей частиц.
+   */
   void CalculateVelocities(System &sys_) {
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
@@ -92,6 +151,11 @@ public:
     }
   }
 
+  /**
+   * @brief Расчет сил.
+   * @param sys_ - система частиц.
+   * @details Расчет сил частиц.
+   */
   void CalculateForces(System &sys_) {
     int pn = sys_.particleNumber();
     std::vector<Particle> &particles = sys_.particles();
@@ -106,7 +170,7 @@ public:
     std::vector<std::future<void>> futures;
 
     // Предрасчеты для потенциала EAM
-    if (force_.getPotentialType() == Potential::PotentialType::EAM) {
+    if (force_.getPotentialType() == PotentialType::EAM) {
       for (int start = 0; start < pn; start += blockSize) {
         int end = std::min(start + blockSize, pn);
         // enqueue задачу на вычисление для блока [start, end)
@@ -152,7 +216,7 @@ public:
                 result_interaction_i.force += interaction_ij.force;
                 result_interaction_i.virials += interaction_ij.virials;
               }
-              if (force_.getPotentialType() == Potential::PotentialType::EAM) {
+              if (force_.getPotentialType() == PotentialType::EAM) {
                 // Потенциальная энергия в ЕАМ считается 1 раз сразу для всей
                 // частицы
                 result_interaction_i.e_pot =
@@ -166,73 +230,12 @@ public:
     for (auto &f : futures) {
       f.get();
     }
-    /*
-        double max_Fx = -INFINITY, max_Fy = -INFINITY, max_Fz = -INFINITY;
-        double min_Fx = INFINITY, min_Fy = INFINITY, min_Fz = INFINITY;
-        double sum_Fx = 0, sum_Fy = 0, sum_Fz = 0;
-
-        double max_VirXX = -INFINITY, max_VirYY = -INFINITY, max_VirZZ =
-       -INFINITY; double min_VirXX = INFINITY, min_VirYY = INFINITY, min_VirZZ =
-       INFINITY; double sum_VirXX = 0, sum_VirYY = 0, sum_VirZZ = 0; for (int i
-       = 0; i < pn; i++) { if (particles[i].getForceX() > max_Fx) max_Fx =
-       particles[i].getForceX(); if (particles[i].getForceX() < min_Fx) min_Fx =
-       particles[i].getForceX();
-
-          if (particles[i].getForceY() > max_Fy)
-            max_Fy = particles[i].getForceY();
-          if (particles[i].getForceY() < min_Fy)
-            min_Fy = particles[i].getForceY();
-
-          if (particles[i].getForceZ() > max_Fz)
-            max_Fz = particles[i].getForceZ();
-          if (particles[i].getForceZ() < min_Fz)
-            min_Fz = particles[i].getForceZ();
-
-          sum_Fx += particles[i].getForceX();
-          sum_Fy += particles[i].getForceY();
-          sum_Fz += particles[i].getForceZ();
-
-          if (particles[i].virials().xx() > max_VirXX)
-            max_VirXX = particles[i].virials().xx();
-          if (particles[i].virials().xx() < min_VirXX)
-            min_VirXX = particles[i].virials().xx();
-
-          if (particles[i].virials().yy() > max_VirYY)
-            max_VirYY = particles[i].virials().yy();
-          if (particles[i].virials().yy() < min_VirYY)
-            min_VirYY = particles[i].virials().yy();
-
-          if (particles[i].virials().zz() > max_VirZZ)
-            max_VirZZ = particles[i].virials().zz();
-          if (particles[i].virials().zz() < min_VirZZ)
-            min_VirZZ = particles[i].virials().zz();
-
-          sum_VirXX += particles[i].virials().xx();
-          sum_VirYY += particles[i].virials().yy();
-          sum_VirZZ += particles[i].virials().zz();
-        }
-
-        std::cout << "Force max: \n\tFx_max: " << max_Fx << "\n\tFy_max: " <<
-       max_Fy
-                  << "\n\tFz_max: " << max_Fz
-                  << "\nForce min: \n\tFx_min: " << min_Fx
-                  << "\n\tFy_min: " << min_Fy << "\n\tFz_min: " << min_Fz
-                  << "\nForce sum: \n\tFx_sum: " << sum_Fx
-                  << "\n\tFy_sum: " << sum_Fy << "\n\tFz_sum: " << sum_Fz <<
-       "\n";
-
-        std::cout << "Virial max: \n\tVirXX_max: " << max_VirXX
-                  << "\n\tVirYY_max: " << max_VirYY
-                  << "\n\tVirZZ_max: " << max_VirZZ
-                  << "\nVirial min: \n\tVirXX_min: " << min_VirXX
-                  << "\n\tVirYY_min: " << min_VirYY
-                  << "\n\tVirZZ_min: " << min_VirZZ
-                  << "\nVirial sum: \n\tVirXX_sum: " << sum_VirXX
-                  << "\n\tVirYY_sum: " << sum_VirYY
-                  << "\n\tVirZZ_sum: " << sum_VirZZ << "\n";
-                  */
   }
 
+  /**
+   * @brief Нулевой шаг.
+   * @param sys_ - система частиц.
+   */
   void initialStep(System &sys_) {
     backupManager_.createBackup(sys_);
     // Расчет сил
@@ -253,11 +256,17 @@ public:
     outputManager_.writeSystemProperties(sys_);
     outputManager_.writeStepData(sys_);
   }
+
+  /**
+   * @brief Расчет шага.
+   * @param sys_ - система частиц.
+   * @details Расчет шага.
+   */
   bool advanceStep(System &sys_) {
     sys_.advanceStep();
     // Термостат Ланжевена
     if (thermostat_ && thermostat_->getThermostatType() ==
-                           Thermostat::ThermostatType::LANGEVIN) {
+                           ThermostatType::LANGEVIN) {
       std::cout << "Applying Langevin thermostat" << std::endl;
       thermostat_->applyTemperatureControl(sys_);
     }
@@ -283,7 +292,7 @@ public:
 
     // Термостат Берендсена
     if (thermostat_ && thermostat_->getThermostatType() ==
-                           Thermostat::ThermostatType::BERENDSEN) {
+                           ThermostatType::BERENDSEN) {
       std::cout << "Applying Berendsen thermostat" << std::endl;
       thermostat_->applyTemperatureControl(sys_);
     }
@@ -324,20 +333,33 @@ public:
     return false;
   }
 
-  MDAlgorithms() = delete;
+  /**
+   * @brief Конструктор.
+   * @param settings - настройки.
+   * @param sys - система частиц.
+   * @param backupManager - менеджер бекапов.
+   * @param outputManager - менеджер вывода.
+   * @param threadPool - пул потоков.
+   * @param ensemble_manager - менеджер ансамблей.
+   * @param potential - потенциал.
+   * @param thermostat - термостат.
+   * @param barostat - баростат.
+   * @param macroparams - макропараметры.
+   */
   MDAlgorithms(Settings &settings, System &sys, BackupManager &backupManager,
                OutputManager &outputManager, ThreadPool &threadPool,
                std::unique_ptr<EnsembleManager> &&ensemble_manager,
                std::unique_ptr<Potential> &&potential,
                std::unique_ptr<Thermostat> &&thermostat,
-               std::unique_ptr<Barostat> &&barostat, json macroparams_config)
+               std::unique_ptr<Barostat> &&barostat, Macroparams &macroparams)
       : settings_(settings), threadPool_(threadPool),
         ensemble_manager_(std::move(ensemble_manager)),
         backupManager_(backupManager), outputManager_(outputManager),
         thermostat_(std::move(thermostat)), barostat_(std::move(barostat)),
         force_(settings_, std::move(potential), sys), coords_(settings_),
-        vels_(settings_), macroparams_(macroparams_config, settings) {};
+        vels_(settings_), macroparams_(macroparams) {};
 
+  MDAlgorithms() = delete;
   ~MDAlgorithms() = default;
 
   // Запрещаем копирование

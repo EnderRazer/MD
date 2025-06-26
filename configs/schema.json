@@ -1,0 +1,188 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "backup": {
+        "type": "object",
+        "properties": {
+          "frequency": { "type": "integer", "description": "Частота сохранения бекапов" },
+          "restore_step": { "type": "integer", "description": "Начальный шаг для восстановления" },
+          "toggle": { "type": "boolean", "description": "Включить восстановление с бекапа" }
+        },
+        "required": ["frequency", "restore_step", "toggle"]
+      },
+      "barostat": {
+        "type": "object",
+        "properties": {
+          "pref_pressure": { "type": "number", "description": "Предпочитаемое давление" },
+          "tau": { "type": "number", "description": "Время взаимодействия с резервуаром" },
+          "toggle": { "type": "boolean", "description": "Включить баростат" },
+          "type": { 
+            "type": "string",
+            "enum": ["BRNDSN"],
+            "description": "Тип баростата"
+        }
+        },
+        "required": ["pref_pressure", "tau", "toggle", "type"]
+      },
+      "dimensions": {
+        "type": "object",
+        "properties": {
+          "crist_length": { "type": "number", "description": "Длина ребра кристаллической ячейки" },
+          "crist_num": {
+            "type": "array",
+            "items": { "type": "integer", "description": "Количество кристаллических ячеек вдоль осей" },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "void_num": {
+            "type": "array",
+            "items": { "type": "integer", "description": "Количество пустотых ячеек вдоль осей" },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        },
+        "required": ["crist_length", "crist_num", "void_num"]
+      },
+      "macroparams": {
+        "type": "object",
+        "properties": {
+          "toggle": { "type": "boolean", "description": "Включить расчет транспортных коэффициентов" },
+          "macroparam_type": { "type": "string", "enum": ["GK", "EIN"], "description": "Тип расчета транспортных коэффициентов" }
+        },
+        "required": ["toggle", "macroparam_type"]
+      },
+      "ensemble": {
+        "type": "object",
+        "properties": {
+          "toggle": { "type": "boolean", "description": "Включить расчет усреднения по ансамблям" },
+          "threads": { "type": "integer", "description": "Количество потоков" },
+          "quantity": { "type": "integer", "description": "Количество ансамблей" },
+          "size": { "type": "integer", "description": "Размер ансамбля" },
+          "offset": { "type": "integer", "description": "Сдвиг ансамбля" }
+        },
+        "required": ["toggle", "threads", "quantity", "size", "offset"]
+      },
+      "potential": {
+        "type": "object",
+        "properties": {
+          "params": {
+            "type": "object",
+            "properties": {
+              "r_e": { "type": "number" },
+              "f_e": { "type": "number" },
+              "rho_e": { "type": "number" },
+              "rho_s": { "type": "number" },
+              "om_e": { "type": "number" },
+              "om_n": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "om": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "alpha": { "type": "number" },
+              "beta": { "type": "number" },
+              "a": { "type": "number" },
+              "b": { "type": "number" },
+              "k": { "type": "number" },
+              "lambda": { "type": "number" },
+              "eta": { "type": "number" },
+              "m": { "type": "integer" },
+              "n": { "type": "integer" },
+              "energy_unit": { "type": "number" },
+              "r_cut": { "type": "number" }
+            },
+            "required": ["r_e", "f_e", "rho_e", "rho_s", "om_e", "om_n", "om", "alpha", "beta", "a", "b", "k", "lambda", "eta", "m", "n", "energy_unit", "r_cut"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["EAM", "LJ"],
+            "description": "Тип потенциала: EAM или LJ."
+          }
+        },
+        "required": ["params", "type"]
+      },
+      "settings": {
+        "type": "object",
+        "properties": {
+          "debug": { "type": "boolean", "description": "Включить отладочный режим" },
+          "delta_t": { "type": "number", "description": "Шаг по времени" },
+          "nsteps": { "type": "integer", "description": "Количество шагов" },
+          "pbc": { "type": "boolean", "description": "Включить периодические граничные условия" },
+          "profiling": { "type": "boolean", "description": "Включить профилирование" },
+          "start_temp": { "type": "number", "description": "Начальная температура" },
+          "threads": { "type": "integer", "description": "Количество потоков" }
+        },
+        "required": ["debug", "delta_t", "nsteps", "pbc", "profiling", "start_temp", "threads"]
+      },
+      "material": {
+        "type": "object",
+        "properties": {
+          "mass": { "type": "number", "description": "Масса частицы" },
+          "struct_type": { "type": "string", "enum": ["CP","FCC"], "description": "Тип структуры: CP,FCC" }
+        },
+        "required": ["mass", "struct_type"]
+      },
+      "custom": {
+        "type": "object",
+        "properties": {
+          "particles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "array",
+                  "items": { "type": "number" },
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                "velocity": {
+                  "type": "array",
+                  "items": { "type": "number" },
+                  "minItems": 3,
+                  "maxItems": 3
+                }
+              },
+              "required": ["position", "velocity"]
+            }
+          }
+        },
+        "required": ["particles"]
+      },
+      "thermostat": {
+        "type": "object",
+        "properties": {
+          "pref_temp": { "type": "number", "description": "Предпочитаемая температура" },
+          "stream_velocity": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "Скорость потока"
+          },
+          "tau": { "type": "number", "description": "Время взаимодействия с резервуаром" },
+          "toggle": { "type": "boolean", "description": "Включить термостат" },
+          "type": { "type": "string", "enum": ["LNGVN", "BRNDSN"], "description": "Тип термостата" }
+        },
+        "required": ["pref_temp", "stream_velocity", "tau", "toggle", "type"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "main_directory": { "type": "string", "description": "Основной каталог" },
+          "steps_directory": { "type": "string", "description": "Каталог шагов" },
+          "ensembles_directory": { "type": "string", "description": "Каталог ансамблей" },
+          "frequency": { "type": "integer", "description": "Частота сохранения" }
+        },
+        "required": ["main_directory", "steps_directory", "ensembles_directory", "frequency"]
+      }
+    },
+    "required": ["backup", "barostat", "dimensions", "macroparams", "ensemble", "potential", "settings", "material", "custom", "thermostat", "output"]
+  }

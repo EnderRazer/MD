@@ -8,8 +8,20 @@
 #include "classes/Particle.h"
 #include "classes/Vector3.h"
 
+/**
+ * @brief Класс для списка ячеек.
+ *
+ * Класс для списка ячеек, который определяет методы для построения списка ячеек и получения соседей.
+ */
 class CellList {
 public:
+  /**
+   * @brief Конструктор.
+   *
+   * Конструктор для списка ячеек.
+   * @param cutoff - радиус обрезания.
+   * @param boxSize - размер ячейки.
+   */
   CellList(double cutoff, const Vector3<double> &boxSize)
       : cutoff_(cutoff), boxSize_(boxSize) {
     numCells_.x() =
@@ -25,6 +37,12 @@ public:
     cells_.resize(totalCells_);
   }
 
+  /**
+   * @brief Построение списка ячеек.
+   *
+   * Построение списка ячеек.
+   * @param particles - вектор частиц.
+   */
   void build(const std::vector<Particle> &particles) {
     clearCells();
     for (int i = 0; i < particles.size(); ++i) {
@@ -39,6 +57,14 @@ public:
     }
   }
 
+  /**
+   * @brief Получение списка соседей.
+   *
+   * Получение списка соседей для частицы.
+   * @param particles - вектор частиц.
+   * @param index - индекс частицы.
+   * @return вектор соседей.
+   */
   std::vector<int> getNeighbors(const std::vector<Particle> &particles,
                                 const int index) const {
     std::vector<int> neighbors;
@@ -62,6 +88,7 @@ public:
             if (index != cells_[neighborIdx][i]) {
               Vector3<double> rVec = particles[cells_[neighborIdx][i]].coord() -
                                      particles[index].coord();
+              
               // Mirrorig vector (PBC)
               if (rVec.x() > boxSize_.x() / 2)
                 rVec.x() -= boxSize_.x();
@@ -91,6 +118,12 @@ public:
     return neighbors;
   }
 
+  /**
+   * @brief Получение базовой информации о списке ячеек.
+   *
+   * Получение базовой информации о списке ячеек.
+   * @return строка с информацией о списке ячеек.
+   */
   inline const std::string getData() const {
     std::ostringstream oss;
     oss << "CellList Data:";
@@ -103,22 +136,61 @@ public:
     return oss.str();
   }
 
+  /**
+   * @brief Получение количества ячеек.
+   *
+   * Получение количества ячеек.
+   * @return количество ячеек.
+   */
   inline const int getNumCells() const { return totalCells_; };
 
 private:
+  /**
+   * @brief Радиус обрезания.
+   */
   double cutoff_;
+
+  /**
+   * @brief Размер бокса.
+   */
   Vector3<double> boxSize_;
+
+  /**
+   * @brief Размер ячейки.
+   */
   Vector3<double> cellSize_;
+
+  /**
+   * @brief Количество ячеек.
+   */
   Vector3<int> numCells_;
+
+  /**
+   * @brief Общее количество ячеек.
+   */
   int totalCells_;
+  
+  /**
+   * @brief Список ячеек.
+   */
   std::vector<std::vector<int>> cells_;
 
+  /**
+   * @brief Очистка списка ячеек.
+   */
   void clearCells() {
     for (auto &cell : cells_) {
       cell.clear();
     }
   }
 
+  /**
+   * @brief Получение индекса ячейки.
+   *
+   * Получение индекса ячейки для частицы.
+   * @param pos - координаты частицы.
+   * @return индекс ячейки.
+   */
   int getCellIndex(const Vector3<double> &pos) const {
     int x = std::min(static_cast<int>(std::floor(pos.x() / cellSize_.x())),
                      numCells_.x() - 1);

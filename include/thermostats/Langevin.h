@@ -7,7 +7,7 @@
 #include <sstream>
 
 #include "nlohmann/json.hpp"
-#include "random_normalized.h"
+#include "helpers/random_normalized.h"
 
 #include "classes/Particle.h"
 #include "classes/Vector3.h"
@@ -18,24 +18,69 @@
 
 using json = nlohmann::json;
 
+/**
+ * @brief Класс для термостата Ланжевена.
+ * @details Класс предоставляет методы для управления температурой системы.
+ */
 class ThermostatLangevine : public Thermostat {
-public:
+private:
+/**
+   * @brief Тип термостата.
+   */
   const ThermostatType type_{ThermostatType::LANGEVIN};
 
-private:
+  /**
+   * @brief Сид.
+   */
   int seed_{0};
-  bool toggle_{false};
-  double tau_t_{0.0};
-  double pref_temperature_{0.0};
-  Vector3<double> Vs_{}; // Скорость потока
 
+  /**
+   * @brief Флаг включения термостата.
+   */
+  bool toggle_{false};
+
+  /**
+   * @brief Время взаимодействия с резервуаром.
+   */
+  double tau_t_{0.0};
+
+  /**
+   * @brief Предпочтительная температура.
+   */
+  double pref_temperature_{0.0};
+
+  /**
+   * @brief Скорость потока.
+   */
+  Vector3<double> Vs_{};
+
+  /**
+   * @brief Константа для термостата Ланжевена.
+   */
   double sigma_lang_{0.0}; // Константа для термостата Ланжевена
 
-  double eps_{0.0};                   // Случайная величина (0;1)
-  std::vector<Vector3<double>> Fr_{}; // Случайная сила
-  std::vector<Vector3<double>> Ft_{}; // Сила трения
+  /**
+   * @brief Случайная величина.
+   */
+  double eps_{0.0};
+
+  /**
+   * @brief Случайная сила.
+   */
+  std::vector<Vector3<double>> Fr_{};
+
+  /**
+   * @brief Сила трения.
+   */
+  std::vector<Vector3<double>> Ft_{};
+
 public:
-  ~ThermostatLangevine() noexcept override = default;
+  /**
+   * @brief Конструктор.
+   * @param config - конфигурация.
+   * @param settings - настройки.
+   * @param particle_number - количество частиц.
+   */
   ThermostatLangevine(json &config, Settings &settings, int particle_number) {
     toggle_ = config.value("toggle", false);
     pref_temperature_ = config.value("pref_temp", 0.0);
@@ -49,10 +94,22 @@ public:
     Ft_.resize(particle_number);
   }
 
-  // Запрещаем копирование
-  ThermostatLangevine(const ThermostatLangevine &) = delete;
-  ThermostatLangevine &operator=(const ThermostatLangevine &) = delete;
+  /**
+   * @brief Деструктор.
+   */
+  ~ThermostatLangevine() noexcept override = default;
 
+/**
+   * @brief Получение типа термостата.
+   * @return Тип термостата.
+   */
+  inline const ThermostatType getThermostatType() const override {
+    return type_;
+  }
+  /**
+   * @brief Генерация случайной силы.
+   * @param sys - система частиц.
+   */
   void LGVN_generateFr(System &sys) {
     int pn = sys.particleNumber();
     for (int i = 0; i < pn / 2; i++) {
@@ -71,14 +128,23 @@ public:
     }
   };
 
+  /**
+   * @brief Генерация силы трения.
+   * @param sys - система частиц.
+   */
   void LGVN_generateFt(System &sys) {
     int pn = sys.particleNumber();
     std::vector<Particle> &particles = sys.particles();
     for (int i = 0; i < pn; i++) {
       Ft_[i] =
-          -particles[i].getMass() * (particles[i].velocity() - Vs_) / tau_t_;
+          -particles[i].mass() * (particles[i].velocity() - Vs_) / tau_t_;
     }
   };
+
+  /**
+   * @brief Применение температурного контроля.
+   * @param sys - система частиц.
+   */
   void applyTemperatureControl(System &sys) override {
     LGVN_generateFr(sys);
     LGVN_generateFt(sys);
@@ -89,6 +155,10 @@ public:
     }
   };
 
+  /**
+   * @brief Получение базовой информации о термостате.
+   * @return Базовая информация о термостате.
+   */
   std::string getData() const override {
     std::ostringstream oss;
     oss.precision(16);
@@ -99,8 +169,9 @@ public:
         << "\n\tSIGMA_LANG: " << sigma_lang_ << "\n";
     return oss.str();
   }
-  inline const ThermostatType getThermostatType() const override {
-    return type_;
-  }
+
+  // Запрещаем копирование
+  ThermostatLangevine(const ThermostatLangevine &) = delete;
+  ThermostatLangevine &operator=(const ThermostatLangevine &) = delete;
 };
 #endif

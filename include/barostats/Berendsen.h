@@ -14,23 +14,53 @@
 
 using json = nlohmann::json;
 
+/**
+ * @brief Класс для баростата Берндесена.
+ *
+ * Класс для баростата Берндесена, который определяет методы для применения баростата Берндесена к системе.
+ */
 class BarostatBerendsen : public Barostat {
 private:
+
+  /**
+   * @brief Тип баростата.
+   */
   const BarostatType type_{BarostatType::BERENDSEN};
+
+  /**
+   * @brief Флаг для включения/выключения баростата.
+   */
   bool toggle_{false};
+
+  /**
+   * @brief Предпочитаемое давление.
+   */
   double pref_pressure_{0.0};
+
+  /**
+   * @brief Время взаимодействия с резервуаром.
+   */
   double tau_b_{0.0};
 
+  /**
+   * @brief Коэффициент для расчета нового давления.
+   */
   double dt_over_tau_{0.0};
 
 public:
+  /**
+   * @brief Конструктор.
+   */
   BarostatBerendsen(json &config, Settings &settings) {
     toggle_ = config.value("toggle", false);
     pref_pressure_ = config.value("pref_pressure", 0.0);
     tau_b_ = config.value("tau", 0.0);
-
     dt_over_tau_ = settings.dt() / tau_b_;
   };
+
+  /**
+   * @brief Применение давления.
+   */
   void applyPressureControl(System &sys) override {
     double hi = 1 - dt_over_tau_ * (pref_pressure_ - sys.pressure());
     double mu = pow(hi, 0.33333333);
@@ -42,6 +72,10 @@ public:
     Vector3<double> new_sizes = sys.dimensions().sizes() * mu;
     sys.dimensions().setSizes(new_sizes);
   }
+
+  /**
+   * @brief Получение базовой информации о баростате.
+   */
   std::string getData() const override {
     std::ostringstream oss;
     oss.precision(16);
@@ -52,6 +86,9 @@ public:
     return oss.str();
   }
 
+  /**
+   * @brief Получение типа баростата.
+   */
   inline const BarostatType getBarostatType() const override { return type_; }
 
   // Запрещаем копирование

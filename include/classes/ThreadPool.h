@@ -9,11 +9,21 @@
 #include <stdexcept>
 #include <thread>
 
+/**
+ * @brief Класс для управления пулом потоков.
+ * @details Класс предоставляет интерфейс для управления пулом потоков.
+ * Он позволяет добавлять задачи в очередь и получать результаты выполнения
+ * задач.
+ */
 class ThreadPool {
 public:
-  // Конструктор: создаёт пул с заданным количеством потоков.
-  // По умолчанию создаётся количество потоков = числу аппаратных ядер (если
-  // возможно определить).
+  /**
+   * @brief Конструктор класса ThreadPool.
+   * @param threads - количество потоков в пуле.
+   * @details Конструктор создает пул потоков с заданным количеством потоков.
+   * По умолчанию создается количество потоков = числу аппаратных ядер (если
+   * возможно определить).
+   */
   explicit ThreadPool(size_t threads = std::thread::hardware_concurrency())
       : stop_(false) {
     if (threads == 0) {
@@ -50,12 +60,10 @@ public:
     }
   }
 
-  // Запрещаем копировать пул потоков (можно разрешить, но придётся аккуратно
-  // реализовывать).
-  ThreadPool(const ThreadPool &) = delete;
-  ThreadPool &operator=(const ThreadPool &) = delete;
-
-  // Деструктор — останавливаем все потоки
+  /**
+   * @brief Деструктор класса ThreadPool.
+   * @details Деструктор останавливает все потоки в пуле.
+   */
   ~ThreadPool() {
     {
       // Ставим флаг stop_ = true
@@ -70,8 +78,12 @@ public:
     }
   }
 
-  // Функция добавления (enqueue) новой задачи в пул.
-  // Возвращает future, позволяющий получить результат задачи.
+  /**
+   * @brief Добавление новой задачи в пул.
+   * @param f - функция, которая будет выполнена.
+   * @param args - аргументы функции.
+   * @return future, позволяющий получить результат задачи.
+   */
   template <class F, class... Args>
   auto enqueue(F &&f, Args &&...args)
       -> std::future<typename std::invoke_result<F, Args...>::type> {
@@ -96,24 +108,57 @@ public:
     condition_.notify_one();
     return res;
   }
+
+  /**
+   * @brief Получение количества потоков в пуле.
+   * @return Количество потоков в пуле.
+   */
   const int getThreads() const { return threads_; };
+
+  /**
+   * @brief Получение данных о пуле потоков.
+   * @return Данные о пуле потоков.
+   */
   const std::string getData() const {
     std::ostringstream oss;
     oss << "Thread pool data:" << "\n\tThreads: " << threads_ << std::endl;
     return oss.str();
   }
 
+  // Запрещаем копировать пул потоков (можно разрешить, но придётся аккуратно
+  // реализовывать).
+  ThreadPool(const ThreadPool &) = delete;
+  ThreadPool &operator=(const ThreadPool &) = delete;
+
 private:
+  /**
+   * @brief Количество потоков в пуле.
+   */
   int threads_{0};
-  // Наши рабочие потоки
+
+  /**
+   * @brief Наши рабочие потоки.
+   */
   std::vector<std::thread> workers_;
-  // Очередь задач (каждая задача — это std::function<void()>)
+
+  /**
+   * @brief Очередь задач (каждая задача — это std::function<void()>)
+   */
   std::queue<std::function<void()>> tasks_;
 
-  // Синхронизация
+  /**
+   * @brief Синхронизация.
+   */
   std::mutex queue_mutex_;
+
+  /**
+   * @brief Условная переменная.
+   */
   std::condition_variable condition_;
-  // Флаг остановки пула
+
+  /**
+   * @brief Флаг остановки пула.
+   */
   bool stop_;
 };
 

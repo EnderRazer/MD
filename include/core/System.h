@@ -11,9 +11,14 @@
 #include "classes/Particle.h"   //Класс частицы
 
 #include "core/Settings.h" //Класс параметров
+#include "classes/Structure.h" //Класс структуры
 
 using json = nlohmann::json;
 
+/**
+ * @brief Класс для работы с системой частиц.
+ * @details Класс предоставляет методы для работы с системой частиц.
+ */
 class System {
 private:
   int current_step_{0}; // Текущий шаг моделирования
@@ -45,7 +50,17 @@ private:
 
 public:
   System() = default;
-  // Конструкторы / Деструкторы
+  ~System() = default;
+
+  // Запрещаем копирование
+  System(const System &) = delete;
+  System &operator=(const System &) = delete;
+
+  /**
+   * @brief Конструктор.
+   * @param config - конфигурация.
+   * @param settings - настройки.
+   */
   System(const json &config, const Settings &settings)
       : dimensions_(config.at("dimensions")) {
     if (settings.structType() == std::string("CP")) {
@@ -77,18 +92,14 @@ public:
     // Предзаполнение массива частиц
     initializeParticles(settings.mass());
   }
-  ~System() = default;
-
-  // Запрещаем копирование
-  System(const System &) = delete;
-  System &operator=(const System &) = delete;
 
   // Сеттеры и геттеры
   inline int currentStep() const { return current_step_; }
   inline void setCurrentStep(int step) { current_step_ = step; }
 
-  inline int particleNumber() const { return particle_number_; }
-  inline void setParticleNumber(int number) { particle_number_ = number; }
+  inline int particleNumber() const {
+    return particle_number_;
+  }
 
   inline Dimensions &dimensions() { return dimensions_; }
   inline const Dimensions &dimensions() const { return dimensions_; }
@@ -122,8 +133,9 @@ public:
         ((temperature_avg_ * (current_step_ - 1)) + temperature_) /
         current_step_;
   }
+
   inline Matrix3 pressureTensors() { return pressure_tensors_; };
-  inline Matrix3 pressureTensors() const { return pressure_tensors_; };
+  inline const Matrix3 pressureTensors() const { return pressure_tensors_; };
   inline void setPressureTensors(Matrix3 p_t) { pressure_tensors_ = p_t; };
 
   inline double pressure() const { return pressure_; }
@@ -148,7 +160,10 @@ public:
     pulse_avg_ = ((pulse_avg_ * (current_step_ - 1)) + pulse_) / current_step_;
   }
 
-  // Методы
+  /**
+   * @brief Обновление энергий.
+   * @details Обновление энергий системы.
+   */
   void updateEnergy() {
     double e_pot = 0, e_kin = 0, e_term = 0, e_int = 0, e_full = 0;
     for (auto &p : particles_) {
@@ -166,6 +181,11 @@ public:
     energies_.set(Energy::EnergyType::Internal, e_int / particle_number_);
     energies_.set(Energy::EnergyType::Full, e_full / particle_number_);
   }
+
+  /**
+   * @brief Обновление усредненных энергий.
+   * @details Обновление усредненных энергий системы.
+   */
   void updateEnergyAvg() {
     int prev_factor = (current_step_ - 1) / current_step_;
     double curr_factor = 1.0 / current_step_;
@@ -181,6 +201,11 @@ public:
                         prev_avg * prev_factor + curr_value * curr_factor);
     }
   }
+
+  /**
+   * @brief Обновление скорости центра масс.
+   * @details Обновление скорости центра масс системы.
+   */
   void updateVCM() {
     Vector3<double> vel;
     for (Particle &p : particles_) {
@@ -188,6 +213,11 @@ public:
     }
     vcm_ = vel / particle_number_;
   }
+
+  /**
+   * @brief Обновление импульса системы.
+   * @details Обновление импульса системы.
+   */
   void updatePulse() {
     double pulse = 0.0;
     for (Particle &p : particles_) {
@@ -196,9 +226,16 @@ public:
     pulse_ = pulse / particle_number_;
   }
 
+  /**
+   * @brief Обновление шага.
+   * @details Обновление шага системы.
+   */
   inline void advanceStep() { current_step_++; }
 
-  // Output methods
+  /**
+   * @brief Получение базовой информации о системе.
+   * @details Получение базовой информации о системе.
+   */
   std::string getData() const {
     std::ostringstream oss;
     oss.precision(16);
@@ -209,6 +246,11 @@ public:
 
     return oss.str();
   }
+
+  /**
+   * @brief Получение краткой информации о системе. Для вывода в консоль.
+   * @details Получение краткой информации о системе.
+   */
   std::string getShortData() const {
     std::ostringstream oss;
     oss.precision(16);
@@ -220,6 +262,11 @@ public:
 
     return oss.str();
   }
+
+  /**
+   * @brief Получение информации о частицах.
+   * @details Получение информации о частицах.
+   */
   std::string getParticlesInfo() const {
     std::ostringstream oss;
     oss.precision(16);
@@ -230,6 +277,11 @@ public:
 
     return oss.str();
   }
+
+  /**
+   * @brief Получение информации о координатах частиц.
+   * @details Получение информации о координатах частиц.
+   */
   std::string getParticlesCoordsInfo() const {
     std::ostringstream oss;
     oss.precision(16);
@@ -240,6 +292,11 @@ public:
 
     return oss.str();
   }
+
+  /**
+   * @brief Получение информации о скоростях частиц.
+   * @details Получение информации о скоростях частиц.
+   */
   std::string getParticlesVelocityInfo() const {
     std::ostringstream oss;
     oss.precision(16);

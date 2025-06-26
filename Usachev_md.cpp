@@ -9,7 +9,7 @@ using namespace std;
 #include "barostats/Berendsen.h"     //Баростат
 #include "classes/EnsembleManager.h" //Менеджер ансамблей
 #include "classes/ThreadPool.h"      //Пул тредов
-#include "classes/Timer.h"           //Таймер
+#include "helpers/Timer.h"           //Таймер
 #include "core/MDAlgorithms.h"       //Алгоритмы МД
 #include "core/Settings.h"           //Класс настроек
 #include "core/System.h"             //Класс системы
@@ -23,6 +23,11 @@ using namespace std;
 using namespace std;
 
 // Фабрика потенциала
+/**
+ * @brief Создание потенциала.
+ * @param config - конфигурация.
+ * @return Указатель на потенциал.
+ */
 std::unique_ptr<Potential> createPotential(const json &config) {
   std::string type = config.value("type", "LJ");
   if (type == "LJ") {
@@ -37,6 +42,13 @@ std::unique_ptr<Potential> createPotential(const json &config) {
 }
 
 // Фабрика термостата
+/**
+ * @brief Создание термостата.
+ * @param config - конфигурация.
+ * @param settings - настройки.
+ * @param pn - количество частиц.
+ * @return Указатель на термостат.
+ */
 std::unique_ptr<Thermostat> createThermostat(const json &config,
                                              Settings &settings, int pn) {
   std::string type = config.value("type", "BRNDSN");
@@ -52,6 +64,12 @@ std::unique_ptr<Thermostat> createThermostat(const json &config,
 }
 
 // Фабрика баростата
+/**
+ * @brief Создание баростата.
+ * @param config - конфигурация.
+ * @param settings - настройки.
+ * @return Указатель на баростат.
+ */
 std::unique_ptr<Barostat> createBarostat(const json &config,
                                          Settings &settings) {
   std::string type = config.value("type", "BRNDSN");
@@ -112,7 +130,6 @@ int main(int argc, char *argv[]) {
     }
 
     // Создаём потенциал, термостат и баростат через фабрики:
-
     // Заводим потенциал (обязателен)
     std::unique_ptr<Potential> potential{nullptr};
     if (!config.contains("potential"))
@@ -158,12 +175,13 @@ int main(int argc, char *argv[]) {
       cout << ensembleManager->getData() << endl;
     }
 
-    // Заводим переменную MDAlgorimths, которая содержит все методы МД
-    json macroparams_config = config["macroparams"];
+    
+    Macroparams macroparams = Macroparams(config["macroparams"], settings);
+// Заводим переменную MDAlgorimths, которая содержит все методы МД
     MDAlgorithms md = MDAlgorithms(settings, sys, backupManager, outputManager,
                                    threadPool, std::move(ensembleManager),
                                    std::move(potential), std::move(thermostat),
-                                   std::move(barostat), macroparams_config);
+                                   std::move(barostat), macroparams);
 
     // Записываем конфигурацию запуска
     outputManager.writeModellingProperties(config);
