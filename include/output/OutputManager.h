@@ -229,6 +229,8 @@ public:
         sys.pressure(),
         sys.energies().get(Energy::EnergyType::Kinetic),
         sys.energies().get(Energy::EnergyType::Potential),
+        sys.energies().get(Energy::EnergyType::Thermodynamic),
+        sys.energies().get(Energy::EnergyType::Internal),
         sys.energies().get(Energy::EnergyType::Full),
         sys.pulse()};
 
@@ -252,6 +254,8 @@ public:
         sys.pressureAvg(),
         sys.energiesAvg().get(Energy::EnergyType::Kinetic),
         sys.energiesAvg().get(Energy::EnergyType::Potential),
+        sys.energiesAvg().get(Energy::EnergyType::Thermodynamic),
+        sys.energiesAvg().get(Energy::EnergyType::Internal),
         sys.energiesAvg().get(Energy::EnergyType::Full),
         sys.pulseAvg()};
 
