@@ -1,6 +1,7 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
+#include <algorithm>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <sstream>
@@ -11,7 +12,7 @@
 #include "classes/Particle.h"   //Класс частицы
 
 #include "core/Settings.h" //Класс параметров
-#include "classes/Structure.h" //Класс структуры
+//#include "classes/Structure.h" //Класс структуры
 
 using json = nlohmann::json;
 
@@ -22,19 +23,25 @@ using json = nlohmann::json;
 class System {
 private:
   int current_step_{0}; // Текущий шаг моделирования
-
   int particle_number_{0}; // Количество частиц
 
   Dimensions dimensions_{};           // Размеры системы
   std::vector<Particle> particles_{}; // Частицы
+  //std::vector<Structure> structures_{}; // Структуры
 
   Energy energies_{};     // Усредненные энергии системы на 1 частицу
   Energy energies_avg_{}; // Усредненные энергии системы по шагам
 
-  double temperature_{0.0},
-      temperature_avg_{0.0}; // Температура моментальная/усредненная по шагам
-  double pressure_{0.0},
-      pressure_avg_{0.0}; // Давление моментальное/усредненное по шагам
+  int window_size_{1000}; // Размер окна температуры/давления
+
+  double temperature_{0.0}; //Температура моментальная
+  std::deque<double> temperature_window_{}; // Окно температуры
+  double temperature_avg_{0.0}; // Температура усредненная по шагам
+  
+  double pressure_{0.0}; // Давление моментальное
+  std::deque<double> pressure_window_{}; // Окно давления
+  double pressure_avg_{0.0}; // Давление усредненное по шагам
+  
   Matrix3 pressure_tensors_{};
 
   Vector3<double> vcm_{}; // Скорость центра масс
@@ -122,16 +129,28 @@ public:
   }
 
   inline double temperature() const { return temperature_; }
-  inline void setTemperature(double temp) { temperature_ = temp; }
-
-  inline double temperatureAvg() const { return temperature_avg_; }
-  inline void setTemperatureAvg(double temp_avg) {
-    temperature_avg_ = temp_avg;
+  inline double temperatureWindow() const {
+    int size = temperature_window_.size();
+    double temp_window = 0.0;
+    for(int i = 0; i < size;i++){
+      temp_window+=temperature_window_[i];
+    }
+    return temp_window/size;
   }
-  inline void updateTemperatureAvg() {
+  inline double temperatureAvg() const { return temperature_avg_; }
+
+  inline void setTemperature(double temp) {
+    // Моментальная температура
+    temperature_ = temp;
+    // Оконное усреднение температуры (за n шагов)
+    temperature_window_.push_back(temp);
+    if (temperature_window_.size() > window_size_) {
+      temperature_window_.pop_front();
+    }
+    // Усредненная температура по шагам
     temperature_avg_ =
-        ((temperature_avg_ * (current_step_ - 1)) + temperature_) /
-        current_step_;
+        ((temperature_avg_ * (current_step_ - 1)) + temp) /
+        std::max(current_step_,1);
   }
 
   inline Matrix3 pressureTensors() { return pressure_tensors_; };
@@ -139,13 +158,27 @@ public:
   inline void setPressureTensors(Matrix3 p_t) { pressure_tensors_ = p_t; };
 
   inline double pressure() const { return pressure_; }
-  inline void setPressure(double pres) { pressure_ = pres; }
-
+  inline double pressureWindow() const {
+    int size = pressure_window_.size();
+    double press_window = 0.0;
+    for(int i = 0; i < size;i++){
+      press_window+=pressure_window_[i];
+    }
+    return press_window/size;}
   inline double pressureAvg() const { return pressure_avg_; }
-  inline void setPressureAvg(double pres_avg) { pressure_avg_ = pres_avg; }
-  inline void updatePressureAvg() {
-    pressure_avg_ =
-        ((pressure_avg_ * (current_step_ - 1)) + pressure_) / current_step_;
+
+  inline void setPressure(double pres) { 
+    // Моментальное давление
+    pressure_ = pres;
+
+     // Оконное усреднение давления (за n шагов)
+    pressure_window_.push_back(pres);
+    if (pressure_window_.size() > window_size_) {
+      pressure_window_.pop_front();
+    }
+    // Усредненное давление по шагам
+     pressure_avg_ =
+        ((pressure_avg_ * (current_step_ - 1)) + pres) / std::max(current_step_,1);
   }
 
   inline const Vector3<double> &vcm() const { return vcm_; }
@@ -254,11 +287,11 @@ public:
   std::string getShortData() const {
     std::ostringstream oss;
     oss.precision(16);
-    oss << "Current step: " << current_step_ << "\nMomentum:"
-        << "\n\tTemperature: " << temperature_ << "\n\tPressure: " << pressure_
-        << "\nAverage:"
-        << "\n\tTemperature: " << temperature_avg_
-        << "\n\tPressure: " << pressure_avg_ << "\n";
+    oss << "Current step: " << current_step_ << 
+        "\nMomentum:" << "\n\tTemperature: " << temperature_ << "\n\tPressure: " << pressure_ << 
+        "\nAverage:" << "\n\tTemperature: " << temperature_avg_ << "\n\tPressure: " << pressure_avg_ <<
+        "\nWindow average:" << "\n\tTemperature: " << temperatureWindow() << "\n\tPressure: " << pressureWindow()  
+        << "\n";
 
     return oss.str();
   }
