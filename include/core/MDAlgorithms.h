@@ -310,9 +310,7 @@ public:
     sys_.updatePulseAvg();
     // Расчет макропараметров (Температура, давление)
     sys_.setTemperature(macroparams_.getTemperature(sys_));
-    sys_.updateTemperatureAvg();
     sys_.setPressure(macroparams_.getPressure(sys_));
-    sys_.updatePressureAvg();
     // Транспортные коэффициенты
     if (macroparams_.enabled()) {
       if (ensemble_manager_ && ensemble_manager_->enabled() &&
