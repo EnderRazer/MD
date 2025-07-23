@@ -1,11 +1,11 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-#include <algorithm>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
+#include <deque>
 
 #include "classes/Dimensions.h" //Размеры куба
 #include "classes/Energy.h"     //Энергии
