@@ -191,7 +191,9 @@ int main(int argc, char *argv[]) {
     cout << "Начало расчета!" << endl;
     Timer step_timer(0); // Таймер для отслеживания времени выполнения шагов
     step_timer.start();
+    cout << "Нулевой шаг" << endl;
     md.initialStep(sys); // Начальный (нулевой) шаг
+    cout << "Нулевой шаг расчитан" << endl;
     step_timer.stop();
     cout << sys.getShortData() << endl;
     cout << "Init step done in " << step_timer.elapsed() << endl;
