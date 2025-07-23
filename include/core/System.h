@@ -137,7 +137,7 @@ public:
     }
     return temp_window/size;
   }
-  inline double temperatureAvg() const { return temperature_avg_; }
+  inline double temperatureAvg() const { return temperature_avg_/current_step_; }
 
   inline void setTemperature(double temp) {
     // Моментальная температура
@@ -148,9 +148,7 @@ public:
       temperature_window_.pop_front();
     }
     // Усредненная температура по шагам
-    temperature_avg_ =
-        ((temperature_avg_ * (current_step_ - 1)) + temp) /
-        std::max(current_step_,1);
+    temperature_avg_ += temp;
   }
 
   inline Matrix3 pressureTensors() { return pressure_tensors_; };
@@ -165,7 +163,7 @@ public:
       press_window+=pressure_window_[i];
     }
     return press_window/size;}
-  inline double pressureAvg() const { return pressure_avg_; }
+  inline double pressureAvg() const { return pressure_avg_/current_step_; }
 
   inline void setPressure(double pres) { 
     // Моментальное давление
@@ -177,8 +175,7 @@ public:
       pressure_window_.pop_front();
     }
     // Усредненное давление по шагам
-     pressure_avg_ =
-        ((pressure_avg_ * (current_step_ - 1)) + pres) / std::max(current_step_,1);
+    pressure_avg_ += pres;
   }
 
   inline const Vector3<double> &vcm() const { return vcm_; }
@@ -289,7 +286,7 @@ public:
     oss.precision(16);
     oss << "Current step: " << current_step_ << 
         "\nMomentum:" << "\n\tTemperature: " << temperature_ << "\n\tPressure: " << pressure_ << 
-        "\nAverage:" << "\n\tTemperature: " << temperature_avg_ << "\n\tPressure: " << pressure_avg_ <<
+        "\nAverage:" << "\n\tTemperature: " << temperatureAvg() << "\n\tPressure: " << pressureAvg() <<
         "\nWindow average:" << "\n\tTemperature: " << temperatureWindow() << "\n\tPressure: " << pressureWindow()  
         << "\n";
 
