@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <ostream>
 #include <vector>
 
@@ -71,6 +72,10 @@ private:
    */
   std::unique_ptr<Barostat> barostat_;
 
+  /**
+   * @brief Потенциал
+   */
+  std::unique_ptr<Potential> potential_;
   /**
    * @brief Алгоритмы расчета сил.
    */
@@ -161,7 +166,7 @@ public:
     std::vector<Particle> &particles = sys_.particles();
 
     // Создаем список ячеек
-    CellList cellList(force_.getCutOff(), sys_.dimensions().sizes());
+    CellList cellList(potential_->getRcut(), sys_.dimensions().sizes());
     std::cout << cellList.getData() << std::endl;
     cellList.build(particles);
 
@@ -170,11 +175,12 @@ public:
     std::vector<std::future<void>> futures;
 
     // Предрасчеты для потенциала EAM
-    if (force_.getPotentialType() == PotentialType::EAM) {
+    if (potential_->getPotentialType() == PotentialType::EAM) {
+      EAM* eam_potential = dynamic_cast<EAM*>(potential_.get());
       for (int start = 0; start < pn; start += blockSize) {
         int end = std::min(start + blockSize, pn);
         // enqueue задачу на вычисление для блока [start, end)
-        futures.push_back(threadPool_.enqueue([this, &pn, &particles, &cellList,
+        futures.push_back(threadPool_.enqueue([this,&eam_potential, &pn, &particles, &cellList,
                                                start, end]() {
           for (int i = start; i < end; i++) {
             particles[i].setElectronDensity(0.0);
@@ -183,7 +189,7 @@ public:
             for (int j : neighbors) {
               if (i == j)
                 continue;
-              force_.preCompute(particles[i], particles[j]);
+              force_.preComputeEAM(*eam_potential,particles[i], particles[j],settings_.hasPbc());
             }
           }
         }));
@@ -195,36 +201,69 @@ public:
     }
     // Основной блок расчетов
     futures.clear();
-    for (int start = 0; start < pn; start += blockSize) {
-      int end = std::min(start + blockSize, pn);
-      // enqueue задачу на вычисление для блока [start, end)
-      futures.push_back(
-          threadPool_.enqueue([this, &pn, &particles, &cellList, start, end]() {
-            for (int i = start; i < end; i++) {
-              ForceCalcValues result_interaction_i;
-              ForceCalcValues interaction_ij;
-              std::vector<int> neighbors = cellList.getNeighbors(particles, i);
-              for (int j : neighbors) {
-                if (i == j)
-                  continue;
-                interaction_ij = force_.compute(particles[i], particles[j]);
-                result_interaction_i.interaction_count +=
-                    interaction_ij.interaction_count;
-                // При ЕАМ возвращается e_pot = 0, так как вычисляется позже
-                // сразу на всю частицу без суммы частей
-                result_interaction_i.e_pot += interaction_ij.e_pot;
-                result_interaction_i.force += interaction_ij.force;
-                result_interaction_i.virials += interaction_ij.virials;
-              }
-              if (force_.getPotentialType() == PotentialType::EAM) {
-                // Потенциальная энергия в ЕАМ считается 1 раз сразу для всей
-                // частицы
+    if(potential_->getPotentialType() == PotentialType::EAM){
+      EAM* eam_potential = dynamic_cast<EAM*>(potential_.get());
+      for (int start = 0; start < pn; start += blockSize) {
+        int end = std::min(start + blockSize, pn);
+        // enqueue задачу на вычисление для блока [start, end)
+        futures.push_back(
+            threadPool_.enqueue([this,&eam_potential, &pn, &particles, &cellList, start, end]() {
+              for (int i = start; i < end; i++) {
+                ForceCalcValues result_interaction_i;
+                ForceCalcValues interaction_ij;
+                std::vector<int> neighbors = cellList.getNeighbors(particles, i);
+                for (int j : neighbors) {
+                  if (i == j)
+                    continue;
+                  interaction_ij = force_.compute(*eam_potential,particles[i], particles[j],settings_.hasPbc());
+                  result_interaction_i.interaction_count +=
+                      interaction_ij.interaction_count;
+                  // При ЕАМ возвращается e_pot = 0, так как вычисляется позже
+                  // сразу на всю частицу без суммы частей
+                  result_interaction_i.e_pot += interaction_ij.e_pot;
+                  result_interaction_i.force += interaction_ij.force;
+                  result_interaction_i.virials += interaction_ij.virials;
+                }
+                  // Потенциальная энергия в ЕАМ считается 1 раз сразу для всей
+                  // частицы
                 result_interaction_i.e_pot =
-                    force_.PotentialEnergy_EAM(particles[i]);
+                      eam_potential->getU(particles[i].electron_density(),particles[i].pairPotential());
+                particles[i].applyForceInteraction(result_interaction_i);
               }
-              particles[i].applyForceInteraction(result_interaction_i);
-            }
-          }));
+            }));
+        }
+    }
+    // Ждём завершения всех
+    for (auto &f : futures) {
+      f.get();
+    }
+
+    futures.clear();
+    if(potential_->getPotentialType() == PotentialType::LJ){
+      LJ* lj_potential = dynamic_cast<LJ*>(potential_.get());
+      for (int start = 0; start < pn; start += blockSize) {
+        int end = std::min(start + blockSize, pn);
+        // enqueue задачу на вычисление для блока [start, end)
+        futures.push_back(
+            threadPool_.enqueue([this,&lj_potential, &pn, &particles, &cellList, start, end]() {
+              for (int i = start; i < end; i++) {
+                ForceCalcValues result_interaction_i;
+                ForceCalcValues interaction_ij;
+                std::vector<int> neighbors = cellList.getNeighbors(particles, i);
+                for (int j : neighbors) {
+                  if (i == j)
+                    continue;
+                  interaction_ij = force_.compute(*lj_potential,particles[i], particles[j],settings_.hasPbc());
+                  result_interaction_i.interaction_count +=
+                      interaction_ij.interaction_count;
+                  result_interaction_i.e_pot += interaction_ij.e_pot;
+                  result_interaction_i.force += interaction_ij.force;
+                  result_interaction_i.virials += interaction_ij.virials;
+                }
+                particles[i].applyForceInteraction(result_interaction_i);
+              }
+            }));
+        }
     }
     // Ждём завершения всех
     for (auto &f : futures) {
@@ -237,15 +276,21 @@ public:
    * @param sys_ - система частиц.
    */
   void initialStep(System &sys_) {
+    std::cout << "Создание бекапа" << std::endl;
     backupManager_.createBackup(sys_);
     // Расчет сил
+    std::cout << "Расчет сил" << std::endl;
     CalculateForces(sys_);
     // Обновление центра масс
+    std::cout << "Расчет центра масс" << std::endl;
     sys_.updateVCM();
     // Обновление энергий
+    std::cout << "Обновление энергий" << std::endl;
     sys_.updateEnergy();
     // Расчет макропараметров (Температура, давление)
+    std::cout << "Расчет температуры" << std::endl;
     sys_.setTemperature(macroparams_.getTemperature(sys_));
+    std::cout << "Расчет давления" << std::endl;
     sys_.setPressure(macroparams_.getPressure(sys_));
 
     if (ensemble_manager_ && ensemble_manager_->enabled()) {
@@ -253,6 +298,7 @@ public:
       ensemble_manager_->accumulateGreenCubo(sys_);
     }
     // Вывод в файл
+    std::cout << "Вывод в файл" << std::endl;
     outputManager_.writeSystemProperties(sys_);
     outputManager_.writeStepData(sys_);
   }
@@ -354,7 +400,8 @@ public:
         ensemble_manager_(std::move(ensemble_manager)),
         backupManager_(backupManager), outputManager_(outputManager),
         thermostat_(std::move(thermostat)), barostat_(std::move(barostat)),
-        force_(settings_, std::move(potential), sys), coords_(settings_),
+        potential_(std::move(potential)),
+        force_(settings_, sys), coords_(settings_),
         vels_(settings_), macroparams_(macroparams) {};
 
   MDAlgorithms() = delete;
