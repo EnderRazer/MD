@@ -62,7 +62,7 @@ private:
    * @param settings - настройки.
    */
   void generateFCC(System &sys, Settings &settings) {
-    Vector3<int> offset = sys.dimensions().numVoid();
+    Vector3<int> offset = sys.dimensions().numVoid()/2;
     Vector3<int> limit = settings.hasPbc() ? sys.dimensions().numCrists()
                                            : sys.dimensions().numCrists() + 1;
 
