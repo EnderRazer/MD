@@ -62,8 +62,9 @@ public:
    * @brief Применение давления.
    */
   void applyPressureControl(System &sys) override {
-    double hi = 1 - dt_over_tau_ * (pref_pressure_ - sys.pressure());
-    double mu = pow(hi, 0.33333333);
+    double hi = 1 - dt_over_tau_ * (pref_pressure_ - sys.pressureWindow());
+    hi = std::clamp(hi, 0.95, 1.05);
+    double mu = std::cbrt(hi);
 
     for (Particle &particle : sys.particles()) {
       Vector3<double> new_coord = particle.coord() * mu;
