@@ -6,7 +6,6 @@
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
-#include <vector>
 
 #include "classes/Dimensions.h" //Размеры куба
 #include "classes/Energy.h"     //Энергии
