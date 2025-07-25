@@ -2,6 +2,7 @@
 #define BSBERENDSEN_H
 
 #include "nlohmann/json.hpp"
+#include <algorithm>
 #include <cmath>
 #include <sstream>
 #include <string>
@@ -33,7 +34,8 @@ public:
   };
   void applyPressureControl(System &sys) override {
     double hi = 1 - dt_over_tau_ * (pref_pressure_ - sys.pressure());
-    double mu = pow(hi, 0.33333333);
+    hi = std::clamp(hi,0.5,1.5);
+    double mu = std::cbrt(hi);
 
     for (Particle &particle : sys.particles()) {
       Vector3<double> new_coord = particle.coord() * mu;
