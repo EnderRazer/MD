@@ -4,7 +4,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "classes/Vector3.h"
+#include "Vector3.h"
 #include "nlohmann/json.hpp"
 
 using json = nlohmann::json;
