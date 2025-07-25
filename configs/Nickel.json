@@ -1,19 +1,19 @@
 {
   "backup": {
     "frequency": 1,
-    "restore_step": 1000000,
+    "restore_step": 1000,
     "toggle": false
   },
   "barostat": {
     "pref_pressure": 0.0,
-    "tau": 1.0,
+    "tau": 2.0,
     "toggle": false,
     "type": "BRNDSN"
   },
   "dimensions": {
     "crist_length": 0.35314,
     "crist_num": [12, 12, 12],
-    "void_num": [9, 9, 9]
+    "void_num": [10, 10, 10]
   },
   "macroparams": {
     "toggle": false,
@@ -56,7 +56,7 @@
     "pbc": false,
     "profiling": false,
     "start_temp": 2.7315,
-    "threads": 10
+    "threads": 8
   },
   "material": {
     "mass": 97.463,
