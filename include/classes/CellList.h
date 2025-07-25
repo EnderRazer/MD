@@ -39,8 +39,7 @@ public:
     }
   }
 
-  std::vector<int> getNeighbors(const std::vector<Particle> &particles,
-                                const int index) const {
+  std::vector<int> getNeighbors(const std::vector<Particle> &particles, const int index, const bool pbc) const {
     std::vector<int> neighbors;
     int cellIdx = getCellIndex(particles[index].coord());
     int cz = cellIdx / (numCells_.x() * numCells_.y());
@@ -50,6 +49,12 @@ public:
     for (int dx = -1; dx <= 1; ++dx) {
       for (int dy = -1; dy <= 1; ++dy) {
         for (int dz = -1; dz <= 1; ++dz) {
+          //Если ПГУ то не смотрим отраженные ячейки
+          if(!pbc){
+            if(cx+dx < 0 || cx+dx >= numCells_.x()) continue;
+            if(cy+dy < 0 || cy+dy >= numCells_.y()) continue;
+            if(cz+dz < 0 || cz+dz >= numCells_.z()) continue;
+          }
           int nx = (cx + dx + numCells_.x()) % numCells_.x();
           int ny = (cy + dy + numCells_.y()) % numCells_.y();
           int nz = (cz + dz + numCells_.z()) % numCells_.z();
@@ -63,6 +68,7 @@ public:
               Vector3<double> rVec = particles[cells_[neighborIdx][i]].coord() -
                                      particles[index].coord();
               // Mirrorig vector (PBC)
+              if(pbc){
               if (rVec.x() > boxSize_.x() / 2)
                 rVec.x() -= boxSize_.x();
               if (rVec.x() <= -boxSize_.x() / 2)
@@ -77,7 +83,7 @@ public:
                 rVec.z() -= boxSize_.z();
               if (rVec.z() <= -boxSize_.z() / 2)
                 rVec.z() += boxSize_.z();
-
+              }
               if (rVec.length() < cutoff_)
                 neighbors.push_back(cells_[neighborIdx][i]);
             }
