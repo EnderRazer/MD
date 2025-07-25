@@ -98,7 +98,7 @@ public:
 
     // Создаем список ячеек
     CellList cellList(force_.getCutOff(), sys_.dimensions().sizes());
-    std::cout << cellList.getData() << std::endl;
+   //std::cout << cellList.getData() << std::endl;
     cellList.build(particles);
 
     const int blockSize = cellList.getNumCells() /
@@ -115,7 +115,7 @@ public:
           for (int i = start; i < end; i++) {
             particles[i].setElectronDensity(0.0);
             particles[i].setPairPotential(0.0);
-            std::vector<int> neighbors = cellList.getNeighbors(particles, i);
+            std::vector<int> neighbors = cellList.getNeighbors(particles, i, settings_.hasPbc());
             for (int j : neighbors) {
               if (i == j)
                 continue;
@@ -139,7 +139,7 @@ public:
             for (int i = start; i < end; i++) {
               ForceCalcValues result_interaction_i;
               ForceCalcValues interaction_ij;
-              std::vector<int> neighbors = cellList.getNeighbors(particles, i);
+              std::vector<int> neighbors = cellList.getNeighbors(particles, i, settings_.hasPbc());
               for (int j : neighbors) {
                 if (i == j)
                   continue;
@@ -258,7 +258,7 @@ public:
     // Термостат Ланжевена
     if (thermostat_ && thermostat_->getThermostatType() ==
                            Thermostat::ThermostatType::LANGEVIN) {
-      std::cout << "Applying Langevin thermostat" << std::endl;
+      //std::cout << "Applying Langevin thermostat" << std::endl;
       thermostat_->applyTemperatureControl(sys_);
     }
 
@@ -271,7 +271,7 @@ public:
     // Баростат Берендсена
     if (barostat_ &&
         barostat_->getBarostatType() == Barostat::BarostatType::BERENDSEN) {
-      std::cout << "Applying Berendsen thermostat" << std::endl;
+      //std::cout << "Applying Berendsen barostat" << std::endl;
       barostat_->applyPressureControl(sys_);
     }
 
@@ -301,9 +301,7 @@ public:
     sys_.updatePulseAvg();
     // Расчет макропараметров (Температура, давление)
     sys_.setTemperature(macroparams_.getTemperature(sys_));
-    sys_.updateTemperatureAvg();
     sys_.setPressure(macroparams_.getPressure(sys_));
-    sys_.updatePressureAvg();
     // Транспортные коэффициенты
     if (macroparams_.enabled()) {
       if (ensemble_manager_ && ensemble_manager_->enabled() &&
