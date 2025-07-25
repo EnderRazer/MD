@@ -1,10 +1,12 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
+#include <deque>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "classes/Dimensions.h" //Размеры куба
 #include "classes/Energy.h"     //Энергии
@@ -26,11 +28,19 @@ private:
   Energy energies_{};     // Усредненные энергии системы на 1 частицу
   Energy energies_avg_{}; // Усредненные энергии системы по шагам
 
-  double temperature_{0.0},
-      temperature_avg_{0.0}; // Температура моментальная/усредненная по шагам
-  double pressure_{0.0},
-      pressure_avg_{0.0}; // Давление моментальное/усредненное по шагам
-  Matrix3 pressure_tensors_{};
+  int window_size_ = 1000;
+
+  //Температура
+  double temperature_{0.0}; // Температура моментальная
+  double temperature_avg_{0.0}; // Температура усредненная по шагам
+  std::deque<double> temperature_window_{}; //Температура, усредненная скользящим окном
+  
+  //Давление
+  double pressure_{0.0}; // Давление моментальное
+  double pressure_avg_{0.0}; // Давление усредненное по шагам
+  std::deque<double> pressure_window_{}; //Давление, усредненная скользящим окном
+ 
+ Matrix3 pressure_tensors_{};
 
   Vector3<double> vcm_{}; // Скорость центра масс
   double pulse_{0.0},
@@ -111,29 +121,45 @@ public:
   }
 
   inline double temperature() const { return temperature_; }
-  inline void setTemperature(double temp) { temperature_ = temp; }
-
-  inline double temperatureAvg() const { return temperature_avg_; }
-  inline void setTemperatureAvg(double temp_avg) {
-    temperature_avg_ = temp_avg;
+  inline double temperatureAvg() const { return temperature_avg_/(current_step_+1); }
+  inline double temperatureWindow() const { 
+    int size = temperature_window_.size();
+    double temp_window = 0.0;
+    for(int i = 0; i < size;i++){
+      temp_window+=temperature_window_[i];
+    }
+    return temp_window/size;
+    }
+  
+  inline void setTemperature(double temp) { 
+    temperature_ = temp; 
+    temperature_window_.push_back(temp);
+    if(temperature_window_.size() > window_size_)
+      temperature_window_.pop_front();
+    temperature_avg_+=temp;
   }
-  inline void updateTemperatureAvg() {
-    temperature_avg_ =
-        ((temperature_avg_ * (current_step_ - 1)) + temperature_) /
-        current_step_;
-  }
+    
   inline Matrix3 pressureTensors() { return pressure_tensors_; };
   inline Matrix3 pressureTensors() const { return pressure_tensors_; };
   inline void setPressureTensors(Matrix3 p_t) { pressure_tensors_ = p_t; };
 
   inline double pressure() const { return pressure_; }
-  inline void setPressure(double pres) { pressure_ = pres; }
-
-  inline double pressureAvg() const { return pressure_avg_; }
-  inline void setPressureAvg(double pres_avg) { pressure_avg_ = pres_avg; }
-  inline void updatePressureAvg() {
-    pressure_avg_ =
-        ((pressure_avg_ * (current_step_ - 1)) + pressure_) / current_step_;
+  inline double pressureAvg() const { return pressure_avg_/(current_step_+1); }
+  inline double pressureWindow() const { 
+    int size = pressure_window_.size();
+    double press_window = 0.0;
+    for(int i = 0; i < size;i++){
+      press_window+=pressure_window_[i];
+    }
+    return press_window/size;
+    }
+  
+  inline void setPressure(double press) { 
+    pressure_ = press; 
+    pressure_avg_+=press;
+    pressure_window_.push_back(press);
+    if(pressure_window_.size() > window_size_)
+      pressure_window_.pop_front();
   }
 
   inline const Vector3<double> &vcm() const { return vcm_; }
@@ -212,11 +238,16 @@ public:
   std::string getShortData() const {
     std::ostringstream oss;
     oss.precision(16);
-    oss << "Current step: " << current_step_ << "\nMomentum:"
-        << "\n\tTemperature: " << temperature_ << "\n\tPressure: " << pressure_
+    oss << "Current step: " << current_step_ << 
+        "\nMomentum:"
+          << "\n\tTemperature: " << temperature_ 
+          << "\n\tPressure: " << pressure_
         << "\nAverage:"
-        << "\n\tTemperature: " << temperature_avg_
-        << "\n\tPressure: " << pressure_avg_ << "\n";
+          << "\n\tTemperature: " << temperatureAvg()
+          << "\n\tPressure: " << pressureAvg() << "\n"
+        << "Window (Last "<<window_size_<<" steps):"
+          << "\n\tTemperature: " << temperatureWindow()
+          << "\n\tPressure: " << pressureWindow() << "\n";
 
     return oss.str();
   }
