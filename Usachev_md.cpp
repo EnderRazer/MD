@@ -125,9 +125,8 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<Thermostat> thermostat{nullptr};
     if (config.contains("thermostat") &&
         config["thermostat"].value("toggle", false)) {
-      json thermo_config = config["thermostat"];
       thermostat =
-          createThermostat(thermo_config, settings, sys.particleNumber());
+          createThermostat(config["thermostat"], settings, sys.particleNumber());
     }
     if (thermostat)
       cout << thermostat->getData() << endl;
@@ -138,8 +137,7 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<Barostat> barostat{nullptr};
     if (config.contains("barostat") &&
         config["barostat"].value("toggle", false)) {
-      json baro_config = config["barostat"];
-      barostat = createBarostat(baro_config, settings);
+      barostat = createBarostat(config["barostat"], settings);
     }
     if (barostat)
       cout << barostat->getData();
