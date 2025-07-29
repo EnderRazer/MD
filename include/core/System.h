@@ -1,6 +1,7 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
+#include <cstddef>
 #include <deque>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -8,8 +9,7 @@
 #include <string>
 
 #include "classes/Dimensions.h" //Размеры куба
-#include "classes/Energy.h"     //Энергии
-#include "classes/Particle.h"   //Класс частицы
+#include "classes/Particles.h"   //Класс частицы
 
 #include "core/Settings.h" //Класс параметров
 
@@ -19,13 +19,12 @@ class System {
 private:
   int current_step_{0}; // Текущий шаг моделирования
 
-  int particle_number_{0}; // Количество частиц
+  Dimensions dimensions_{}; // Размеры системы
+  Particles particles_{}; // Частицы
 
-  Dimensions dimensions_{};           // Размеры системы
-  std::vector<Particle> particles_{}; // Частицы
-
-  Energy energies_{};     // Усредненные энергии системы на 1 частицу
-  Energy energies_avg_{}; // Усредненные энергии системы по шагам
+  // Energies
+  double e_pot_{},e_kin_{},e_int_{},e_term_{},e_full_{}; // Усредненные энергии системы на 1 частицу
+  double e_pot_avg_{},e_kin_avg_{},e_int_avg_{},e_term_avg_{},e_full_avg_{}; // Усредненные энергии системы по шагам
 
   int window_size_ = 1000;
 
@@ -39,52 +38,54 @@ private:
   double pressure_avg_{0.0}; // Давление усредненное по шагам
   std::deque<double> pressure_window_{}; //Давление, усредненная скользящим окном
  
- Matrix3 pressure_tensors_{};
+  //Тензоры давления
+  double pressure_xx_{}, pressure_xy_{}, pressure_xz_{};
+  double pressure_yx_{}, pressure_yy_{}, pressure_yz_{};
+  double pressure_zx_{}, pressure_zy_{}, pressure_zz_{};
 
-  Vector3<double> vcm_{}; // Скорость центра масс
+  double vcm_x_{},vcm_y_{},vcm_z_{}; // Скорость центра масс
+
   double pulse_{0.0},
       pulse_avg_{0.0}; // Импульс системы моментальный/усредненный по шагам
 
-  inline void initializeParticles(double mass) {
-    particles_.reserve(particle_number_);
-    for (int i = 0; i < particle_number_; ++i) {
-      particles_.emplace_back(i, mass);
-    }
-  }
-
 public:
-  System() = default;
   // Конструкторы / Деструкторы
   System(const json &config, const Settings &settings)
       : dimensions_(config.at("dimensions")) {
+    int particle_number = 0;
     if (settings.structType() == std::string("CP")) {
       if (settings.hasPbc()) {
-        particle_number_ = dimensions_.numCristX() * dimensions_.numCristY() *
+        particle_number = dimensions_.numCristX() * dimensions_.numCristY() *
                            dimensions_.numCristZ();
       } else {
-        particle_number_ = (dimensions_.numCristX() + 1) *
+        particle_number = (dimensions_.numCristX() + 1) *
                            (dimensions_.numCristY() + 1) *
                            (dimensions_.numCristZ() + 1);
       }
     } else if (settings.structType() == std::string("FCC")) {
       if (settings.hasPbc()) {
-        particle_number_ = 4 * dimensions_.numCristX() *
+        particle_number = 4 * dimensions_.numCristX() *
                            dimensions_.numCristY() * dimensions_.numCristZ();
       } else {
-        particle_number_ =
+        particle_number =
             (dimensions_.numCristX() + 1) * (dimensions_.numCristY() + 1) *
                 (dimensions_.numCristZ() + 1) +
             (3 * dimensions_.numCristX() * dimensions_.numCristY() *
              (dimensions_.numCristZ() + 1));
       }
     } else if (settings.structType() == std::string("Custom")) {
-      particle_number_ = settings.customLayout().at("particles").size();
+      particle_number = settings.customLayout().at("particles").size();
     } else {
       throw std::runtime_error("Unknown structure type: " +
                                settings.structType());
     }
     // Предзаполнение массива частиц
-    initializeParticles(settings.mass());
+    particles_.resize(particle_number);
+
+    double mass = settings.mass();
+    for(int i=0;i<particles_.size();i++){
+      particles_.mass(i) = mass;
+    }
   }
   ~System() = default;
 
@@ -93,43 +94,41 @@ public:
   System &operator=(const System &) = delete;
 
   // Сеттеры и геттеры
-  inline int currentStep() const { return current_step_; }
-  inline void setCurrentStep(int step) { current_step_ = step; }
+  inline int &currentStep() { return current_step_; }
+  inline const int &currentStep() const { return current_step_; }
 
-  inline int particleNumber() const { return particle_number_; }
-  inline void setParticleNumber(int number) { particle_number_ = number; }
+  inline const size_t particleNumber() const { return particles_.size(); }
 
   inline Dimensions &dimensions() { return dimensions_; }
   inline const Dimensions &dimensions() const { return dimensions_; }
-  inline void setDimensions(const Dimensions &dims) { dimensions_ = dims; }
 
-  inline std::vector<Particle> &particles() { return particles_; }
-  inline const std::vector<Particle> &particles() const { return particles_; }
-  inline void setParticles(std::vector<Particle> parts) {
-    particles_ = std::move(parts);
-  }
+  inline Particles &particles() { return particles_; }
+  inline const Particles &particles() const { return particles_; }
 
-  inline Energy &energies() { return energies_; }
-  inline const Energy &energies() const { return energies_; }
-  inline void setEnergies(const Energy &energy) { energies_ = energy; }
+  // Energies
+  inline const double& ePot() const {return e_pot_; }
+  inline const double& eKin() const {return e_kin_; }
+  inline const double& eTerm() const {return e_term_; }
+  inline const double& eInt() const {return e_int_; }
+  inline const double& eFull() const {return e_full_; }
 
-  inline Energy &energiesAvg() { return energies_avg_; }
-  inline const Energy &energiesAvg() const { return energies_avg_; }
-  inline void setEnergiesAvg(const Energy &energy_avg) {
-    energies_avg_ = energy_avg;
-  }
+  // Energies average
+  inline const double ePotAvg() const {return e_pot_avg_/(current_step_+1); }
+  inline const double eKinAvg() const {return e_kin_avg_/(current_step_+1); }
+  inline const double eTermAvg() const {return e_term_avg_/(current_step_+1); }
+  inline const double eIntAvg() const {return e_int_avg_/(current_step_+1); }
+  inline const double eFullAvg() const {return e_full_avg_/(current_step_+1); }
 
-  inline double temperature() const { return temperature_; }
-  inline double temperatureAvg() const { return temperature_avg_/(current_step_+1); }
-  inline double temperatureWindow() const { 
+  inline const double& temperature() const { return temperature_; }
+  inline const double temperatureAvg() const { return temperature_avg_/(current_step_+1); }
+  inline const double temperatureWindow() const { 
     int size = temperature_window_.size();
     double temp_window = 0.0;
     for(int i = 0; i < size;i++){
       temp_window+=temperature_window_[i];
     }
     return temp_window/size;
-    }
-  
+  }
   inline void setTemperature(double temp) { 
     temperature_ = temp; 
     temperature_window_.push_back(temp);
@@ -138,21 +137,37 @@ public:
     temperature_avg_+=temp;
   }
     
-  inline Matrix3 pressureTensors() { return pressure_tensors_; };
-  inline Matrix3 pressureTensors() const { return pressure_tensors_; };
-  inline void setPressureTensors(Matrix3 p_t) { pressure_tensors_ = p_t; };
+  inline double& pressureXX() { return pressure_xx_; }
+  inline const double& pressureXX() const { return pressure_xx_; }
+  inline double& pressureXY() { return pressure_xy_; }
+  inline const double& pressureXY() const { return pressure_xy_; }
+  inline double& pressureXZ() { return pressure_xz_; }
+  inline const double& pressureXZ() const { return pressure_xz_; }
 
-  inline double pressure() const { return pressure_; }
-  inline double pressureAvg() const { return pressure_avg_/(current_step_+1); }
-  inline double pressureWindow() const { 
+  inline double& pressureYX() { return pressure_yx_; }
+  inline const double& pressureYX() const { return pressure_yx_; }
+  inline double& pressureYY() { return pressure_yy_; }
+  inline const double& pressureYY() const { return pressure_yy_; }
+  inline double& pressureYZ() { return pressure_yz_; }
+  inline const double& pressureYZ() const { return pressure_yz_; }
+
+  inline double& pressureZX() { return pressure_zx_; }
+  inline const double& pressureZX() const { return pressure_zx_; }
+  inline double& pressureZY() { return pressure_zy_; }
+  inline const double& pressureZY() const { return pressure_zy_; }
+  inline double& pressureZZ() { return pressure_zz_; }
+  inline const double& pressureZZ() const { return pressure_zz_; }
+
+  inline const double& pressure() const { return pressure_; }
+  inline const double pressureAvg() const { return pressure_avg_/(current_step_+1); }
+  inline const double pressureWindow() const { 
     int size = pressure_window_.size();
     double press_window = 0.0;
     for(int i = 0; i < size;i++){
       press_window+=pressure_window_[i];
     }
     return press_window/size;
-    }
-  
+  }
   inline void setPressure(double press) { 
     pressure_ = press; 
     pressure_avg_+=press;
@@ -161,64 +176,67 @@ public:
       pressure_window_.pop_front();
   }
 
-  inline const Vector3<double> &vcm() const { return vcm_; }
-  inline void setVcm(const Vector3<double> &v) { vcm_ = v; }
+  inline double& vcmX() { return vcm_x_; }
+  inline const double& vcmX() const { return vcm_x_; }
+  inline double& vcmY() { return vcm_y_; }
+  inline const double& vcmY() const { return vcm_y_; }
+  inline double& vcmZ() { return vcm_z_; }
+  inline const double& vcmZ() const { return vcm_z_; }
 
-  inline double pulse() const { return pulse_; }
-  inline void setPulse(double p) { pulse_ = p; }
+  inline double& pulse() { return pulse_; }
+  inline const double& pulse() const { return pulse_; }
 
-  inline double pulseAvg() const { return pulse_avg_; }
-  inline void setPulseAvg(double pulse_avg) { pulse_avg_ = pulse_avg; }
-  inline void updatePulseAvg() {
-    pulse_avg_ = ((pulse_avg_ * (current_step_ - 1)) + pulse_) / current_step_;
-  }
+  inline double& pulseAvg() { return pulse_avg_; }
+  inline const double& pulseAvg() const { return pulse_avg_; }
+
+  
 
   // Методы
   void updateEnergy() {
+    int size = particles_.size();
+    particles_.updateEnergy(vcm_x_,vcm_y_,vcm_z_);
     double e_pot = 0, e_kin = 0, e_term = 0, e_int = 0, e_full = 0;
-    for (auto &p : particles_) {
-      p.updateEnergy(vcm_);
-      e_pot += p.energy(Energy::EnergyType::Potential);
-      e_kin += p.energy(Energy::EnergyType::Kinetic);
-      e_term += p.energy(Energy::EnergyType::Thermodynamic);
-      e_int += p.energy(Energy::EnergyType::Internal);
-      e_full += p.energy(Energy::EnergyType::Full);
+    for(int i=0;i<size;i++){
+      e_pot += particles_.ePot(i);
+      e_kin += particles_.eKin(i);
+      e_term += particles_.eTerm(i);
+      e_int += particles_.eInt(i);
+      e_full += particles_.eFull(i);
     }
     // Средняя на 1 частицу
-    energies_.set(Energy::EnergyType::Potential, e_pot / particle_number_);
-    energies_.set(Energy::EnergyType::Kinetic, e_kin / particle_number_);
-    energies_.set(Energy::EnergyType::Thermodynamic, e_term / particle_number_);
-    energies_.set(Energy::EnergyType::Internal, e_int / particle_number_);
-    energies_.set(Energy::EnergyType::Full, e_full / particle_number_);
-  }
-  void updateEnergyAvg() {
-    int prev_factor = (current_step_ - 1) / current_step_;
-    double curr_factor = 1.0 / current_step_;
+    e_pot_ = e_pot/size;
+    e_kin_ = e_kin/size;
+    e_term_ = e_term/size;
+    e_int_ = e_int/size;
+    e_full_ = e_full/size;
 
-    for (Energy::EnergyType type :
-         {Energy::EnergyType::Potential, Energy::EnergyType::Kinetic,
-          Energy::EnergyType::Thermodynamic, Energy::EnergyType::Internal,
-          Energy::EnergyType::Full}) {
-      double prev_avg = energies_avg_.get(type);
-      double curr_value = energies_.get(type);
-
-      energies_avg_.set(type,
-                        prev_avg * prev_factor + curr_value * curr_factor);
-    }
+    // Средняя по шагам
+    e_pot_avg_ += e_pot_;
+    e_kin_avg_ += e_kin_;
+    e_term_avg_ += e_term_;
+    e_int_avg_ += e_int_;
+    e_full_avg_ += e_full_;
   }
   void updateVCM() {
-    Vector3<double> vel;
-    for (Particle &p : particles_) {
-      vel += p.velocity();
+    int size = particles_.size();
+    double vel_x{0}, vel_y{0}, vel_z{0};
+    for(int i=0;i<size;i++){
+      vel_x += particles_.velocityX(i);
+      vel_y += particles_.velocityY(i);
+      vel_z += particles_.velocityZ(i);
     }
-    vcm_ = vel / particle_number_;
+    vcm_x_ = vel_x / size;
+    vcm_y_ = vel_y / size;
+    vcm_z_ = vel_z / size;
   }
   void updatePulse() {
+    particles_.updatePulse();
     double pulse = 0.0;
-    for (Particle &p : particles_) {
-      pulse += p.pulse();
+    int size = particles_.size();
+    for(int i=0;i<size;i++){
+      pulse += particles_.pulse(i);
     }
-    pulse_ = pulse / particle_number_;
+    pulse_ = pulse / size;
   }
 
   inline void advanceStep() { current_step_++; }
@@ -227,7 +245,7 @@ public:
   std::string getData() const {
     std::ostringstream oss;
     oss.precision(16);
-    oss << dimensions_.getData() << "\nParticle number: " << particle_number_
+    oss << dimensions_.getData() << "\nParticle number: " << particles_.size()
         << "\nCurrent step: " << current_step_
         << "\nTemperature: " << temperature_ << "\nPressure: " << pressure_
         << "\n";
@@ -250,22 +268,13 @@ public:
 
     return oss.str();
   }
-  std::string getParticlesInfo() const {
-    std::ostringstream oss;
-    oss.precision(16);
-    oss << "Частицы: " << particle_number_ << std::endl;
-    for (const auto &particle : particles_) {
-      oss << particle << std::endl;
-    }
-
-    return oss.str();
-  }
+  
   std::string getParticlesCoordsInfo() const {
     std::ostringstream oss;
     oss.precision(16);
     oss << "Coordinates:\n" << std::endl;
-    for (const auto &particle : particles_) {
-      oss << particle.coord() << std::endl;
+    for(int i=0;i<particles_.size();i++) {
+      oss << i << ": "<< particles_.coordX(i) << "; " << particles_.coordY(i) << "; " << particles_.coordZ(i) << std::endl;
     }
 
     return oss.str();
@@ -274,8 +283,18 @@ public:
     std::ostringstream oss;
     oss.precision(16);
     oss << "Velocity:\n" << std::endl;
-    for (const auto &particle : particles_) {
-      oss << particle.velocity() << std::endl;
+    for(int i=0;i<particles_.size();i++) {
+      oss << i << ": "<< particles_.velocityX(i) << "; " << particles_.velocityY(i) << "; " << particles_.velocityZ(i) << std::endl;
+    }
+
+    return oss.str();
+  }
+  std::string getParticlesForceInfo() const {
+    std::ostringstream oss;
+    oss.precision(16);
+    oss << "Force:\n" << std::endl;
+    for(int i=0;i<particles_.size();i++) {
+      oss << i << ": "<< particles_.forceX(i) << "; " << particles_.forceY(i) << "; " << particles_.forceZ(i) << std::endl;
     }
 
     return oss.str();

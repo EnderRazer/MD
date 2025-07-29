@@ -1,7 +1,8 @@
 #ifndef VELOCITY_ALGORITHM_H
 #define VELOCITY_ALGORITHM_H
 
-#include <classes/Particle.h>
+#include "classes/Timer.h"
+#include <classes/Particles.h>
 #include <core/Settings.h>
 
 class VelocityAlgorithm {
@@ -10,7 +11,13 @@ private:
   const double mt_;
 
 public:
-  inline void compute(Particle &p) { p.addVelocity(p.force() * mt_); }
+  inline void compute(Particles &p) { 
+    Timer timer{1};
+    timer.start();
+    p.computeVelocitiesSIMD(mt_);
+    timer.stop();
+    std::cout << "Velocity time elapsed = " << timer.elapsed() << "ms"<<std::endl;
+  }
 
   VelocityAlgorithm() = delete;
   VelocityAlgorithm(Settings &settings)

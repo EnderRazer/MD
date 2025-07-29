@@ -1,14 +1,14 @@
 #ifndef BSBERENDSEN_H
 #define BSBERENDSEN_H
 
+#include "classes/Dimensions.h"
 #include "nlohmann/json.hpp"
 #include <algorithm>
 #include <cmath>
 #include <sstream>
 #include <string>
 
-#include "classes/Particle.h"
-#include "classes/Vector3.h"
+#include "classes/Particles.h"
 #include "core/System.h"
 
 #include "Barostat.h"
@@ -37,13 +37,22 @@ public:
     hi = std::clamp(hi,0.5,1.5);
     double mu = std::cbrt(hi);
 
-    for (Particle &particle : sys.particles()) {
-      Vector3<double> new_coord = particle.coord() * mu;
-      particle.setCoord(new_coord);
+    Particles &particles = sys.particles();
+    int pn = particles.size();
+    for (int i = 0; i < pn; i++) {
+      particles.coordX(i) *= mu;
+      particles.coordY(i) *= mu;
+      particles.coordZ(i) *= mu;
     }
-    Vector3<double> new_sizes = sys.dimensions().sizes() * mu;
-    sys.dimensions().setSizes(new_sizes);
+
+    Dimensions &dim = sys.dimensions();
+    dim.sizeX() *= mu;
+    dim.sizeY() *= mu;
+    dim.sizeZ() *= mu;
+
+    dim.recalc();
   }
+  
   std::string getData() const override {
     std::ostringstream oss;
     oss.precision(16);

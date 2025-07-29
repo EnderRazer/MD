@@ -2,39 +2,37 @@
 #define COORDINATE_ALGORITHM_H
 
 #include "classes/Dimensions.h"
-#include "classes/Particle.h"
+#include "classes/Particles.h"
+#include "classes/Timer.h"
 #include "core/Settings.h"
 
 class CoordinateAlgorithm {
 private:
   Settings &settings_;
+  double dt_{0.0};
+
 
 public:
-  inline void compute(Particle &p) {
-    p.addCoord(p.velocity() * settings_.dt());
+  inline void compute(Particles &p) {
+    Timer timer{1};
+    timer.start();
+    p.computeCoordinatesSIMD(dt_);
+    timer.stop();
+    std::cout << "Coord time elapsed = " << timer.elapsed() << "ms"<<std::endl;
   }
-  inline void applyPBC(Particle &p, Dimensions dim) {
-    Vector3<double> coords = p.coord();
-    Vector3<double> dimSizes = dim.sizes();
-    if (coords.x() < 0)
-      coords.x() += dimSizes.x();
-    if (coords.x() >= dimSizes.x())
-      coords.x() -= dimSizes.x();
-
-    if (coords.y() < 0)
-      coords.y() += dimSizes.y();
-    if (coords.y() >= dimSizes.y())
-      coords.y() -= dimSizes.y();
-
-    if (coords.z() < 0)
-      coords.z() += dimSizes.z();
-    if (coords.z() >= dimSizes.z())
-      coords.z() -= dimSizes.z();
-
-    p.setCoord(coords);
+  
+  inline void applyPBC(Dimensions &dim, Particles &p) {
+    const double lx = dim.sizeX();
+    const double ly = dim.sizeY();
+    const double lz = dim.sizeZ();
+    for(int i=0;i<p.size();i++){
+      p.coordX(i) -= lx * std::floor(p.coordX(i) / lx);
+      p.coordY(i) -= ly * std::floor(p.coordY(i) / ly);
+      p.coordZ(i) -= lz * std::floor(p.coordZ(i) / lz);
+    }
   }
   CoordinateAlgorithm() = delete;
-  CoordinateAlgorithm(Settings &settings) : settings_(settings) {}
+  CoordinateAlgorithm(Settings &settings) : settings_(settings), dt_(settings_.dt()) {}
   ~CoordinateAlgorithm() = default;
 
   // Запрещаем копирование

@@ -7,12 +7,11 @@
 #include <string>
 #include <vector>
 
+#include "classes/Particles.h"
 #include "nlohmann/json.hpp"
 
 #include "classes/IncrementalIntegrator.h" //Интегральная функция
-#include "classes/Matrix3.h"
 #include "classes/ThreadPool.h"
-#include "classes/Vector3.h"
 #include "core/Settings.h"
 #include "core/System.h"
 //#include "macroparams/Einstein.h"
@@ -20,21 +19,26 @@
 #include "output/OutputManager.h"
 
 struct Ensemble {
-  int id_;  // Идентификатор ансамбля
-  int cur_; // Внутренний счетчик ансамбля
+  int id_{};  // Идентификатор ансамбля
+  int cur_{}; // Внутренний счетчик ансамбля
 
-  std::string filename_;      // Имя файла для записи данных ансамбля
-  std::ofstream output_file_; // Файл для записи данных ансамбля
+  std::string filename_{};      // Имя файла для записи данных ансамбля
+  std::ofstream output_file_{}; // Файл для записи данных ансамбля
 
-  std::vector<Vector3<double>>          // Начальные компоненты скорости
-      init_velocity_{{0.0, 0.0, 0.0}};  // (для расчетов коэффициента диффузии)
-  std::vector<double> accum_acfv_{0.0}; // Автокорреляционные функции скорости
-  std::vector<double> coef_diff_integral_{0.0}; // Интеграл от АКФ
+  std::vector<double> init_velocity_x_{};  // Начальные компоненты скорости
+  std::vector<double> init_velocity_y_{};  // (для расчетов коэффициента диффузии)
+  std::vector<double> init_velocity_z_{};
 
-  Matrix3 init_pressure_tensors_{0.0}; // Начальные тензоры давления системы
-  std::vector<double> accum_acfp_{
-      0.0}; // Автокорреляционные функции тензоров давления
-  std::vector<double> coef_visc_integral_{0.0}; // Интеграл от АКФ
+  std::vector<double> accum_acfv_{}; // Автокорреляционные функции скорости
+  std::vector<double> coef_diff_integral_{}; // Интеграл от АКФ
+
+  // Начальные тензоры давления системы
+  double init_pressure_xx_{}, init_pressure_xy_{}, init_pressure_xz_{};
+  double init_pressure_yx_{}, init_pressure_yy_{}, init_pressure_yz_{};
+  double init_pressure_zx_{}, init_pressure_zy_{}, init_pressure_zz_{}; 
+
+  std::vector<double> accum_acfp_{}; // Автокорреляционные функции тензоров давления
+  std::vector<double> coef_visc_integral_{}; // Интеграл от АКФ
 };
 
 using json = nlohmann::json;
@@ -96,11 +100,24 @@ private:
       return;
     }
     const int pn = sys.particleNumber();
-    const std::vector<Particle> &particles = sys.particles();
+    const Particles &particles = sys.particles();
     for (int j = 0; j < pn; j++) {
-      ens.init_velocity_[j] = particles[j].velocity();
+      ens.init_velocity_x_[j] = particles.velocityX(j);
+      ens.init_velocity_y_[j] = particles.velocityY(j);
+      ens.init_velocity_z_[j] = particles.velocityZ(j);
     }
-    ens.init_pressure_tensors_ = sys.pressureTensors();
+    ens.init_pressure_xx_ = sys.pressureXX();
+    ens.init_pressure_xy_ = sys.pressureXY();
+    ens.init_pressure_xz_ = sys.pressureXZ();
+
+    ens.init_pressure_yx_ = sys.pressureYX();
+    ens.init_pressure_yy_ = sys.pressureYY();
+    ens.init_pressure_yz_ = sys.pressureYZ();
+
+    ens.init_pressure_zx_ = sys.pressureZX();
+    ens.init_pressure_zy_ = sys.pressureZY();
+    ens.init_pressure_zz_ = sys.pressureZZ();
+
     ens.filename_ = "ensemble_" + std::to_string(ens.id_) + ".csv";
     ens.output_file_ = std::ofstream(
         outputManager_.getEnsembleDir() + "/" + ens.filename_, std::ios::app);
@@ -167,7 +184,9 @@ public:
         ensembles_[i].id_ = i;
         ensembles_[i].filename_ = "ensemble_" + std::to_string(i) + ".csv";
         ensembles_[i].cur_ = -i * ensemble_offset_;
-        ensembles_[i].init_velocity_.resize(sys.particleNumber(), {0, 0, 0});
+        ensembles_[i].init_velocity_x_.resize(sys.particleNumber(),0.0);
+        ensembles_[i].init_velocity_y_.resize(sys.particleNumber(),0.0);
+        ensembles_[i].init_velocity_z_.resize(sys.particleNumber(),0.0);
         ensembles_[i].accum_acfv_.resize(ensemble_size_, 0.0);
         ensembles_[i].accum_acfp_.resize(ensemble_size_, 0.0);
         ensembles_[i].coef_diff_integral_.resize(ensemble_size_, 0.0);
@@ -227,7 +246,7 @@ public:
     for (const auto &ensemble : ensembles_) {
       oss << "\n\t\tID Ансамбля: " << ensemble.id_
           << "\n\t\tТекущий шаг: " << ensemble.cur_
-          << "\n\t\tInit Velocity Size: " << ensemble.init_velocity_.size()
+          << "\n\t\tInit Velocity Size: " << ensemble.init_velocity_x_.size()
           << "\n\t\tAccum ACFV Size: " << ensemble.accum_acfv_.size()
           << "\n\t\tCoef Diff Integral Size: "
           << ensemble.coef_diff_integral_.size()
@@ -270,12 +289,12 @@ public:
               initEnsemble(thread_finished_count, ens, sys);
             }
             // Диффузия
-            double acfv = gk.getACFV(sys, ens.init_velocity_);
+            double acfv = gk.getACFV(sys, ens.init_velocity_x_,ens.init_velocity_y_, ens.init_velocity_z_);
             ens.accum_acfv_[ens.cur_] = acfv;
             ens.coef_diff_integral_[ens.cur_] =
                 integral_diff_.add_partial(acfv) / (3 * sys.particleNumber());
             // Вязкость
-            double acfp = gk.getACFP(sys, ens.init_pressure_tensors_);
+            double acfp = gk.getACFP(sys, ens.init_pressure_xy_,ens.init_pressure_yz_, ens.init_pressure_zx_);
             ens.accum_acfp_[ens.cur_] = acfp;
             ens.coef_visc_integral_[ens.cur_] =
                 integral_visc_.add_partial(acfp) * sys.dimensions().volume() /

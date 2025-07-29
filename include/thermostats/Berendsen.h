@@ -8,8 +8,7 @@
 
 #include "nlohmann/json.hpp"
 
-#include "classes/Particle.h"
-#include "classes/Vector3.h"
+#include "classes/Particles.h"
 #include "core/Settings.h"
 #include "core/System.h"
 
@@ -44,9 +43,11 @@ public:
   void applyTemperatureControl(System &sys) override {
     double lambda =
         sqrt(1 + dt_over_tau * ((pref_temperature / sys.temperature()) - 1));
-    for (auto &particle : sys.particles()) {
-      Vector3<double> new_velocity = particle.velocity() * lambda;
-      particle.setVelocity(new_velocity);
+    Particles &particles = sys.particles();
+    for (int i = 0; i < particles.size(); i++) {
+      particles.velocityX(i) *= lambda;
+      particles.velocityY(i) *= lambda;
+      particles.velocityZ(i) *= lambda;
     }
   }
   std::string getData() const override {

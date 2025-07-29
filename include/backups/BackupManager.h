@@ -10,8 +10,7 @@
 #include <stdexcept>
 #include <stdio.h>
 
-#include "classes/Particle.h"
-#include "classes/Vector3.h"
+#include "classes/Particles.h"
 #include "core/System.h"
 
 using json = nlohmann::json;
@@ -91,15 +90,16 @@ private:
     // Write each record in binary
     // NOTE: This assumes 'Record' is trivially copyable (POD).
     // If not, you'd serialize field by field.
-    for (const Particle &p : sys.particles()) {
-      int id = p.getId();
-      double mass = p.getMass();
-      outFile.write(reinterpret_cast<const char *>(&id), sizeof(int));
-      outFile.write(reinterpret_cast<const char *>(&mass), sizeof(double));
-      outFile.write(reinterpret_cast<const char *>(&p.coord()),
-                    sizeof(Vector3<double>));
-      outFile.write(reinterpret_cast<const char *>(&p.velocity()),
-                    sizeof(Vector3<double>));
+    Particles &p = sys.particles();  
+    for(int i = 0; i < p.size(); i++){
+      outFile.write(reinterpret_cast<const char *>(&i), sizeof(int));
+      outFile.write(reinterpret_cast<const char *>(&p.mass(i)), sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.coordX(i)),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.coordY(i)),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.coordZ(i)),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.velocityX(i)),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.velocityY(i)),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.velocityZ(i)),sizeof(double));
     }
 
     outFile.close();
@@ -126,8 +126,7 @@ private:
     size_t recordCount = 0;
     inFile.read(reinterpret_cast<char *>(&recordCount), sizeof(recordCount));
     std::cout << "Reading " << recordCount << " records." << std::endl;
-    sys.particles().clear();
-    sys.particles().reserve(recordCount);
+    sys.particles().resize(recordCount);
 
     // Get current position after reading header
     std::streampos headerEnd = inFile.tellg();
@@ -140,42 +139,48 @@ private:
     inFile.seekg(headerEnd);
 
     // Calculate expected remaining size for old and new formats
-    size_t recordSizeOldFormat = sizeof(double) + sizeof(Vector3<double>) * 2;
-    size_t recordSizeNewFormat =
-        sizeof(int) + sizeof(double) + sizeof(Vector3<double>) * 2;
-    size_t expectedOldSize = recordCount * recordSizeOldFormat;
-    size_t expectedNewSize = recordCount * recordSizeNewFormat;
+    //size_t recordSizeOldFormat = sizeof(double) + sizeof(Vector3<double>) * 2;
+    //size_t recordSizeNewFormat =
+    //    sizeof(int) + sizeof(double) + sizeof(Vector3<double>) * 2;
+    //size_t expectedOldSize = recordCount * recordSizeOldFormat;
+    //size_t expectedNewSize = recordCount * recordSizeNewFormat;
 
     // Get actual remaining size
-    std::streamoff remainingSize = fileSize - headerEnd;
+    //std::streamoff remainingSize = fileSize - headerEnd;
 
     // Determine if we're using old format
-    bool isOldFormat = (static_cast<size_t>(remainingSize) == expectedOldSize);
+    //bool isOldFormat = (static_cast<size_t>(remainingSize) == expectedOldSize);
 
-    std::cout << "Detected " << (isOldFormat ? "old" : "new")
-              << " backup format." << std::endl;
+    //std::cout << "Detected " << (isOldFormat ? "old" : "new")
+    //          << " backup format." << std::endl;
 
     // Read in each Record
+    Particles &particles = sys.particles();
     for (size_t i = 0; i < recordCount; ++i) {
       int id = i;
       double mass;
-      Vector3<double> coord;
-      Vector3<double> velocity;
+      double coord_x,coord_y,coord_z;
+      double velocity_x,velocity_y,velocity_z;
 
-      if (!isOldFormat) {
-        // New format has explicit ID
-        inFile.read(reinterpret_cast<char *>(&id), sizeof(int));
-      }
+      
+      inFile.read(reinterpret_cast<char *>(&id), sizeof(int));
       inFile.read(reinterpret_cast<char *>(&mass), sizeof(double));
-      inFile.read(reinterpret_cast<char *>(&coord), sizeof(Vector3<double>));
-      inFile.read(reinterpret_cast<char *>(&velocity), sizeof(Vector3<double>));
+      inFile.read(reinterpret_cast<char *>(&coord_x), sizeof(double));
+      inFile.read(reinterpret_cast<char *>(&coord_y), sizeof(double));
+      inFile.read(reinterpret_cast<char *>(&coord_z), sizeof(double));
+      inFile.read(reinterpret_cast<char *>(&velocity_x), sizeof(double));
+      inFile.read(reinterpret_cast<char *>(&velocity_y), sizeof(double));
+      inFile.read(reinterpret_cast<char *>(&velocity_z), sizeof(double));
 
-      Particle p;
-      p.setId(id);
-      p.setMass(mass);
-      p.setCoord(coord);
-      p.setVelocity(velocity);
-      sys.particles().push_back(std::move(p)); // Use move to avoid extra copy
+      particles.mass(i) = mass;
+      
+      particles.coordX(i) = coord_x;
+      particles.coordY(i) = coord_y;
+      particles.coordZ(i) = coord_z;
+
+      particles.velocityX(i) = velocity_x;
+      particles.velocityY(i) = velocity_y;
+      particles.velocityZ(i) = velocity_z;
     }
     inFile.close();
     return true;

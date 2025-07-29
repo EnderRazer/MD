@@ -8,11 +8,11 @@
 #define FORCE_ALGORITHM_H
 
 #include "classes/Dimensions.h"
-#include "classes/Matrix3.h"
-#include "classes/Particle.h"
+#include "classes/Particles.h"
 #include "core/Settings.h"
 #include "core/System.h"
 #include "potentials/Potential.h"
+#include <cmath>
 
 /**
  * @class ForceAlgorithm
@@ -28,44 +28,10 @@ class ForceAlgorithm {
 private:
   Settings &settings_; /**< Reference to simulation settings */
   Dimensions &dim_;    /**< Reference to system dimensions */
-  std::unique_ptr<Potential> potential_; /**< Pointer to the potential model */
-
-  /**
-   * @brief Applies mirroring conditions to a vector.
-   *
-   * Adjusts vector components to account for periodic boundary conditions
-   * in all three dimensions.
-   *
-   * @param vec Vector to be adjusted
-   * @param lx System length in x dimension
-   * @param ly System length in y dimension
-   * @param lz System length in z dimension
-   * @return Adjusted vector
-   */
-  inline Vector3<double> mirror_vector(Vector3<double> &vec, double lx,
-                                       double ly, double lz) {
-    double halfLX = lx / 2;
-    double halfLY = ly / 2;
-    double halfLZ = lz / 2;
-
-    if (vec.x() > halfLX)
-      vec.x() -= lx;
-    if (vec.x() <= -halfLX)
-      vec.x() += lx;
-
-    if (vec.y() > halfLY)
-      vec.y() -= ly;
-    if (vec.y() <= -halfLY)
-      vec.y() += ly;
-
-    if (vec.z() > halfLZ)
-      vec.z() -= lz;
-    if (vec.z() <= -halfLZ)
-      vec.z() += lz;
-    return vec;
-  }
+  
 
 public:
+std::unique_ptr<Potential> potential_; /**< Pointer to the potential model */
   /**
    * @brief Computes force and related values between two particles.
    *
@@ -76,26 +42,35 @@ public:
    * @param p2 Second particle
    * @return Calculation results including force, potential energy, etc.
    */
-  inline double PotentialEnergy_EAM(Particle &p1) {
-    return potential_->getU(p1.electron_density(), p1.pairPotential());
+  inline double PotentialEnergy_EAM(Particles &p, int index) {
+      return potential_->getU(p.electronDensity(index), p.pairPart(index));
   }
-  inline ForceCalcValues compute(Particle &p1, Particle &p2) {
+  inline ForceCalcValues compute(Particles &p, int i1, int i2) {
     ForceCalcValues output;
-    Vector3<double> rVec = p1.coord() - p2.coord();
+    double rVec_x = p.coordX(i1) - p.coordX(i2);
+    double rVec_y = p.coordY(i1) - p.coordY(i2);
+    double rVec_z = p.coordZ(i1) - p.coordZ(i2);
+
     // Отражение частицы
     if (settings_.hasPbc()) {
-      double lx = dim_.lx();
-      double ly = dim_.ly();
-      double lz = dim_.lz();
-      rVec = mirror_vector(rVec, lx, ly, lz);
+      double lx = dim_.sizeX();
+      double ly = dim_.sizeY();
+      double lz = dim_.sizeZ();
+
+      rVec_x -= dim_.sizeX() * std::round(rVec_x / lx);
+      rVec_y -= dim_.sizeY() * std::round(rVec_y / ly);
+      rVec_z -= dim_.sizeZ() * std::round(rVec_z / lz);
     }
-    output.rVec = rVec;
-    double lengthSqr = rVec.lengthSquared();
+    output.rVec_x = rVec_x;
+    output.rVec_y = rVec_y;
+    output.rVec_z = rVec_z;
+
+    double lengthSqr = rVec_x*rVec_x + rVec_y*rVec_y + rVec_z*rVec_z;
     // Проверка на соседство
     if (lengthSqr > potential_->getSqrRcut())
       return output;
     output.interaction_count++;
-    double length = rVec.length();
+    double length = std::sqrt(lengthSqr);
     // Расчет силы
     double U = 0.0;
     double FU = 0.0;
@@ -110,7 +85,7 @@ public:
     }
     case Potential::PotentialType::EAM: {
       // U = potential_->getU(p1.electron_density(), p1.pairPotential());
-      FU = potential_->getFU(p1.electron_density(), p2.electron_density(),
+      FU = potential_->getFU(p.electronDensity(i1), p.electronDensity(i2),
                              length);
       break;
     }
@@ -121,8 +96,22 @@ public:
     }
 
     output.e_pot = U;
-    output.force = rVec * FU / length;
-    output.virials = Matrix3::outerProduct(rVec, output.force);
+
+    output.force_x = rVec_x * FU / length;
+    output.force_y = rVec_y * FU / length;
+    output.force_z = rVec_z * FU / length;
+
+    output.virial_xx = rVec_x * output.force_x;
+    output.virial_xy = rVec_x * output.force_y;
+    output.virial_xz = rVec_x * output.force_z;
+
+    output.virial_yx = rVec_y * output.force_x;
+    output.virial_yy = rVec_y * output.force_y;
+    output.virial_yz = rVec_y * output.force_z;
+
+    output.virial_zx = rVec_z * output.force_x;
+    output.virial_zy = rVec_z * output.force_y;
+    output.virial_zz = rVec_z * output.force_z;
 
     return output;
   }
@@ -136,32 +125,40 @@ public:
    * @param p1 First particle
    * @param p2 Second particle
    */
-  inline void preCompute(Particle &p1, Particle &p2) {
-    Vector3<double> rVec = p1.coord() - p2.coord();
+  inline void preCompute(Particles &p, int i1, int i2) {
+    double rVec_x = p.coordX(i1) - p.coordX(i2);
+    double rVec_y = p.coordY(i1) - p.coordY(i2);
+    double rVec_z = p.coordZ(i1) - p.coordZ(i2);
+    
     // Отражение частицы
     if (settings_.hasPbc()) {
-      double lx = dim_.lx();
-      double ly = dim_.ly();
-      double lz = dim_.lz();
-      rVec = mirror_vector(rVec, lx, ly, lz);
+      double lx = dim_.sizeX();
+      double ly = dim_.sizeY();
+      double lz = dim_.sizeZ();
+
+      rVec_x -= dim_.sizeX() * std::round(rVec_x / lx);
+      rVec_y -= dim_.sizeY() * std::round(rVec_y / ly);
+      rVec_z -= dim_.sizeZ() * std::round(rVec_z / lz);
     }
-    double lengthSqr = rVec.lengthSquared();
+
+    double lengthSqr = rVec_x*rVec_x + rVec_y*rVec_y + rVec_z*rVec_z;
     // Проверка на соседство
     if (lengthSqr > potential_->getSqrRcut())
       return;
-    double length = rVec.length();
+    double length = std::sqrt(lengthSqr);
 
     double mu = potential_->getPairPart(length);
     double rho_f = potential_->getDensityPart(length);
 
-    p1.addElectronDensity(rho_f);
-    p1.addPairPotential(mu);
+    p.electronDensity(i1) += rho_f;
+    p.pairPart(i1) += mu;
   }
   /**
    * @brief Returns the cutoff distance for the potential.
    * @return Cutoff distance
    */
   inline const double getCutOff() const { return potential_->getRcut(); }
+  inline const double getCutOffSqr() const { return potential_->getSqrRcut(); }
 
   /**
    * @brief Returns the type of the potential being used.
@@ -188,13 +185,11 @@ public:
                  System &sys)
       : settings_(settings), potential_(std::move(potential)),
         dim_(sys.dimensions()) {}
-  /** @brief Default constructor is deleted */
-  inline ForceAlgorithm() = delete;
-  /** @brief Default destructor */
+
+  ForceAlgorithm() = delete;
   ~ForceAlgorithm() = default;
-  /** @brief Copy constructor is deleted */
+
   ForceAlgorithm(const ForceAlgorithm &) = delete;
-  /** @brief Assignment operator is deleted */
   ForceAlgorithm &operator=(const ForceAlgorithm &) = delete;
 };
 #endif // FORCE_ALGORITHM_H

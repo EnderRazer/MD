@@ -3,178 +3,124 @@
 
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
-#include "Vector3.h"
 #include "nlohmann/json.hpp"
 
 using json = nlohmann::json;
 
 class Dimensions {
 private:
-  double crist_length_;                  // Длина кристалической решетки
-  Vector3<int> num_crist_{0, 0, 0};      // Кол-во кристалических решеток
-  Vector3<int> num_void_{0, 0, 0};       // Кол-во пустых решеток (для металла)
-  Vector3<double> sizes_{0.0, 0.0, 0.0}; // Размер системы (нм)
-  Vector3<double> half_sizes_{0.0, 0.0, 0.0}; // Половинчатые размеры системы
-  Vector3<double> sqr_half_sizes_{0.0, 0.0,
-                                  0.0}; // Квадрат половинчатых размеров системы
+  double crist_length_{0.0};                  // Длина кристалической решетки
+  
+  int num_crist_x_{0},num_crist_y_{0},num_crist_z_{0};  // Кол-во кристалических решеток
+  
+  int num_void_x_{0},num_void_y_{0},num_void_z_{0};  // Кол-во пустых решеток (для металла)
+
+  double size_x_{0},size_y_{0},size_z_{0}; // Размер системы (нм)
+  double half_size_x_{0},half_size_y_{0},half_size_z_{0}; // Половинчатые размеры системы
+  double sqr_half_size_x_{0},sqr_half_size_y_{0},sqr_half_size_z_{0}; // Квадрат половинчатых размеров системы
+  
   double volume_{0.0};                  // Объем
 
 public:
   Dimensions() = default;
+  ~Dimensions() = default;
   //
-  explicit Dimensions(const json &config)
-      : crist_length_(config.value("crist_length", 1.0)),
-        num_crist_{config["crist_num"].get<std::vector<int>>()},
-        num_void_{config["void_num"].get<std::vector<int>>()} {
-    if (crist_length_ < 0)
+  Dimensions(const json &config)
+    {
+    double crist_length = config.value("crist_length", 1.0);
+    std::vector<int>num_crist = config["crist_num"].get<std::vector<int>>();
+    std::vector<int>num_void = config["void_num"].get<std::vector<int>>();
+
+    if (crist_length < 0)
       throw std::invalid_argument("Crystal length must be non-negative");
 
-    if (num_crist_.x() < 0 || num_crist_.y() < 0 || num_crist_.z() < 0)
+    if (num_crist[0] < 0 || num_crist[1] < 0 || num_crist[2] < 0)
       throw std::invalid_argument("Crystal counts must be non-negative");
 
-    if (num_void_.x() < 0 || num_void_.y() < 0 || num_void_.z() < 0)
+    if (num_void[0] < 0 || num_void[1] < 0 || num_void[2] < 0)
       throw std::invalid_argument("Void counts must be non-negative");
 
-    sizes_ = {(num_crist_.x() + num_void_.x()) * crist_length_,
-              (num_crist_.y() + num_void_.y()) * crist_length_,
-              (num_crist_.z() + num_void_.z()) * crist_length_};
-    recalc();
-  }
-
-  // -------------------------
-  // Геттеры
-  // -------------------------
-  inline double cristLength() const { return crist_length_; }
-
-  inline Vector3<int> numCrists() const { return num_crist_; }
-  inline Vector3<int> numVoid() const { return num_void_; }
-  inline Vector3<double> sizes() const { return sizes_; }
-  inline Vector3<double> halfSizes() const { return half_sizes_; }
-  inline Vector3<double> sqrHalfSizes() const { return sqr_half_sizes_; }
-
-  inline int numCristX() const { return num_crist_.x(); }
-  inline int numCristY() const { return num_crist_.y(); }
-  inline int numCristZ() const { return num_crist_.z(); }
-
-  inline double lx() const { return sizes_.x(); }
-  inline double ly() const { return sizes_.y(); }
-  inline double lz() const { return sizes_.z(); }
-
-  inline double halfLX() const { return half_sizes_.x(); }
-  inline double halfLY() const { return half_sizes_.y(); }
-  inline double halfLZ() const { return half_sizes_.z(); }
-
-  inline double sqrHalfLX() const { return sqr_half_sizes_.x(); }
-  inline double sqrHalfLY() const { return sqr_half_sizes_.y(); }
-  inline double sqrHalfLZ() const { return sqr_half_sizes_.z(); }
-
-  inline double volume() const { return volume_; }
-  // -------------------------
-  // Сеттеры
-  // -------------------------
-  inline void setCristLength(double crist_length) {
-    if (crist_length < 0) {
-      throw std::invalid_argument(
-          "Длина кристаллической решетки не может быть отрицательной");
-    }
     crist_length_ = crist_length;
-    sizes_.x() = (num_crist_.x() * crist_length_);
-    sizes_.y() = (num_crist_.y() * crist_length_);
-    sizes_.z() = (num_crist_.z() * crist_length_);
-    recalc();
-  }
+    num_crist_x_ = num_crist[0],num_crist_y_ = num_crist[1],num_crist_z_ = num_crist[2];
+    num_void_x_ = num_void[0],num_void_y_ = num_void[1],num_void_z_ = num_void[2];
 
-  // Изменение кол-ва кристалических решеток
-  inline void setNumCrists(int num_x, int num_y, int num_z) {
-    if (num_x < 0 || num_y < 0 || num_z < 0)
-      throw std::invalid_argument(
-          "Кол-во кристаллических решеток не может быть отрицательным");
+    size_x_ = (num_crist_x_ + num_void_x_) * crist_length_;
+    size_y_ = (num_crist_y_ + num_void_y_) * crist_length_;
+    size_z_ = (num_crist_z_ + num_void_z_) * crist_length_;
 
-    num_crist_ = {num_x, num_y, num_z};
-    sizes_ = {num_x * crist_length_, num_y * crist_length_,
-              num_z * crist_length_};
     recalc();
   }
-  inline void setNumCristX(int numcrist_x) {
-    if (numcrist_x < 0)
-      throw std::invalid_argument(
-          "Кол-во кристалических решеток не может быть отрицательным");
-    num_crist_.x() = numcrist_x;
-    sizes_.x() = num_crist_.x() * crist_length_;
-    recalc();
-  }
-  inline void setNumCristY(int numcrist_y) {
-    if (numcrist_y < 0)
-      throw std::invalid_argument(
-          "Кол-во кристалических решеток не может быть отрицательным");
-    num_crist_.y() = numcrist_y;
-    sizes_.y() = num_crist_.y() * crist_length_;
-    recalc();
-  }
-  inline void setNumCristZ(int numcrist_z) {
-    if (numcrist_z < 0)
-      throw std::invalid_argument(
-          "Кол-во кристалических решеток не может быть отрицательным");
-    num_crist_.z() = numcrist_z;
-    sizes_.z() = num_crist_.z() * crist_length_;
-    recalc();
-  }
-
-  inline void setSizes(Vector3<double> sizes) {
-    if (sizes.x() < 0 || sizes.y() < 0 || sizes.z() < 0)
-      throw std::invalid_argument("Размеры должны быть положительными");
-
-    sizes_ = sizes;
-    recalc();
-  }
-  inline void setSizes(double l_x, double l_y, double l_z) {
-    if (l_x < 0 || l_y < 0 || l_z < 0)
-      throw std::invalid_argument("Размеры должны быть положительными");
-
-    sizes_ = {l_x, l_y, l_z};
-    recalc();
-  }
-  // Меняем размеры напрямую
-  inline void setLX(double l_x) {
-    if (l_x < 0)
-      throw std::invalid_argument("Длина должна быть положительной");
-    sizes_.x() = l_x;
-    recalc();
-  }
-  inline void setLY(double l_y) {
-    if (l_y < 0)
-      throw std::invalid_argument("Длина должна быть положительной");
-    sizes_.y() = l_y;
-    recalc();
-  }
-  inline void setLZ(double l_z) {
-    if (l_z < 0)
-      throw std::invalid_argument("Длина должна быть положительной");
-    sizes_.z() = l_z;
-    recalc();
-  }
-
   // Функция пересчета зависимых переменных.
   inline void recalc() {
-    half_sizes_ = {sizes_.x() / 2.0, sizes_.y() / 2, sizes_.z() / 2};
-    sqr_half_sizes_ = {half_sizes_.x() * half_sizes_.x(),
-                       half_sizes_.y() * half_sizes_.y(),
-                       half_sizes_.z() * half_sizes_.z()};
-    volume_ = sizes_.x() * sizes_.y() * sizes_.z();
+    half_size_x_ = 0.5 * size_x_, 
+      half_size_y_ = 0.5 * size_y_, 
+        half_size_z_ = 0.5 * size_z_;
+
+    sqr_half_size_x_ = half_size_x_ * half_size_x_, 
+      sqr_half_size_y_ = half_size_y_ * half_size_y_, 
+        sqr_half_size_z_ = half_size_z_ * half_size_z_;
+
+    volume_ = size_x_ * size_y_ * size_z_;
   }
 
   std::string getData() const {
     std::ostringstream oss;
     oss.precision(16);
     oss << "System size params:\n\t Crist lenght: " << crist_length_
-        << "\n\t Crist num (x,y,z): " << num_crist_
-        << "\n\t Void num (x,y,z): " << num_void_
-        << "\n\t Size (lx,ly,lz): " << sizes_ << "\n\t Volume: " << volume_
+        << "\n\t Crist num (x,y,z): (" << num_crist_x_ <<", "<<num_crist_y_<<", "<<num_crist_z_<<")"
+        << "\n\t Void num (x,y,z): (" << num_void_x_ <<", "<<num_void_y_<<", "<<num_void_z_<<")"
+        << "\n\t Size (lx,ly,lz): (" << size_x_ <<", "<<size_y_<<", "<<size_z_<<")"
+        << "\n\t Volume: " << volume_
         << "\n";
 
     return oss.str();
   }
+
+  inline double& cristLength() { return crist_length_; }
+  inline const double& cristLength() const { return crist_length_; }
+
+  inline int& numCristX() { return num_crist_x_; }
+  inline const int& numCristX() const { return num_crist_x_; }
+  inline int& numCristY() { return num_crist_y_; }
+  inline const int& numCristY() const { return num_crist_y_; }
+  inline int& numCristZ() { return num_crist_z_; }
+  inline const int& numCristZ() const { return num_crist_z_; }
+
+  inline int& numVoidX() { return num_void_x_; }
+  inline const int& numVoidX() const { return num_void_x_; }
+  inline int& numVoidY() { return num_void_y_; }
+  inline const int& numVoidY() const { return num_void_y_; }
+  inline int& numVoidZ() { return num_void_z_; }
+  inline const int& numVoidZ() const { return num_void_z_; }
+
+  inline double& sizeX() { return size_x_; }
+  inline const double& sizeX() const { return size_x_; }
+  inline double& sizeY() { return size_y_; }
+  inline const double& sizeY() const { return size_y_; }
+  inline double& sizeZ() { return size_z_; }
+  inline const double& sizeZ() const { return size_z_; }
+
+  inline double& halfSizeX() { return half_size_x_; }
+  inline const double& halfSizeX() const { return half_size_x_; }
+  inline double& halfSizeY() { return half_size_y_; }
+  inline const double& halfSizeY() const { return half_size_y_; }
+  inline double& halfSizeZ() { return half_size_z_; }
+  inline const double& halfSizeZ() const { return half_size_z_; }
+
+  inline double& sqrHalfSizeX() { return sqr_half_size_x_; }
+  inline const double& sqrHalfSizeX() const { return sqr_half_size_x_; }
+  inline double& sqrHalfSizeY() { return sqr_half_size_y_; }
+  inline const double& sqrHalfSizeY() const { return sqr_half_size_y_; }
+  inline double& sqrHalfSizeZ() { return sqr_half_size_z_; }
+  inline const double& sqrHalfSizeZ() const { return sqr_half_size_z_; }
+
+  inline double& volume() { return volume_; }
+  inline const double& volume() const { return volume_; }
+
+  Dimensions(const Dimensions &) = delete;
+  Dimensions &operator=(const Dimensions &) = delete;
 };
 
 #endif // DIMENSIONS_H

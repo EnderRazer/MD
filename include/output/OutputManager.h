@@ -7,9 +7,9 @@
 #include <sstream>
 #include <string>
 
+#include "classes/Particles.h"
 #include "nlohmann/json.hpp"
 
-#include "classes/Energy.h"
 #include "core/Settings.h"
 #include "core/System.h"
 
@@ -157,9 +157,11 @@ public:
         static_cast<double>(sys.currentStep()),
         sys.temperature(),
         sys.pressure(),
-        sys.energies().get(Energy::EnergyType::Kinetic),
-        sys.energies().get(Energy::EnergyType::Potential),
-        sys.energies().get(Energy::EnergyType::Full),
+        sys.eKin(),
+        sys.ePot(),
+        sys.eTerm(),
+        sys.eInt(),
+        sys.eFull(),
         sys.pulse()};
 
     writeRowToFile(filename, headers, data, true);
@@ -176,9 +178,11 @@ public:
         static_cast<double>(sys.currentStep()),
         sys.temperatureAvg(),
         sys.pressureAvg(),
-        sys.energiesAvg().get(Energy::EnergyType::Kinetic),
-        sys.energiesAvg().get(Energy::EnergyType::Potential),
-        sys.energiesAvg().get(Energy::EnergyType::Full),
+        sys.eKinAvg(),
+        sys.ePotAvg(),
+        sys.eTermAvg(),
+        sys.eIntAvg(),
+        sys.eFullAvg(),
         sys.pulseAvg()};
 
     writeRowToFile(filename, headers, data, true);
@@ -195,31 +199,25 @@ public:
 
     std::vector<std::vector<double>> data;
     int id = 0;
-
-    for (const auto &particle : sys.particles()) {
-      const auto &id = particle.getId();
-      const auto &coord = particle.coord();
-      const auto &velocity = particle.velocity();
-      const auto &force = particle.force();
-      const auto &energies = particle.energies();
-
+    Particles &particles = sys.particles();
+    for (int i = 0; i< particles.size(); i++) {
       std::vector<double> row = {
-          static_cast<double>(id),
-          coord.x(),
-          coord.y(),
-          coord.z(),
-          velocity.x(),
-          velocity.y(),
-          velocity.z(),
-          force.x(),
-          force.y(),
-          force.z(),
-          energies.get(Energy::EnergyType::Potential),
-          energies.get(Energy::EnergyType::Kinetic),
-          energies.get(Energy::EnergyType::Thermodynamic),
-          energies.get(Energy::EnergyType::Internal),
-          energies.get(Energy::EnergyType::Full)};
-
+          static_cast<double>(i),
+          particles.coordX(i),
+          particles.coordY(i),
+          particles.coordZ(i),
+          particles.velocityX(i),
+          particles.velocityY(i),
+          particles.velocityZ(i),
+          particles.forceX(i),
+          particles.forceY(i),
+          particles.forceZ(i),
+          particles.ePot(i),
+          particles.eKin(i),
+          particles.eTerm(i),
+          particles.eInt(i),
+          particles.eFull(i)
+      };
       data.push_back(row);
     }
 

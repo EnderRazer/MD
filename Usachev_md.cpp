@@ -10,6 +10,7 @@ using namespace std;
 #include "classes/EnsembleManager.h" //Менеджер ансамблей
 #include "classes/ThreadPool.h"      //Пул тредов
 #include "classes/Timer.h"           //Таймер
+#include "classes/CellList.h"
 #include "core/MDAlgorithms.h"       //Алгоритмы МД
 #include "core/Settings.h"           //Класс настроек
 #include "core/System.h"             //Класс системы
@@ -156,12 +157,13 @@ int main(int argc, char *argv[]) {
       cout << ensembleManager->getData() << endl;
     }
 
+    CellList cellList;
     // Заводим переменную MDAlgorimths, которая содержит все методы МД
     json macroparams_config = config["macroparams"];
     MDAlgorithms md = MDAlgorithms(settings, sys, backupManager, outputManager,
-                                   threadPool, std::move(ensembleManager),
-                                   std::move(potential), std::move(thermostat),
-                                   std::move(barostat), macroparams_config);
+                                   threadPool,cellList, std::move(ensembleManager),
+                                   std::move(thermostat), std::move(barostat), 
+                                   std::move(potential), macroparams_config);
 
     // Записываем конфигурацию запуска
     outputManager.writeModellingProperties(config);
