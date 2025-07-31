@@ -56,12 +56,13 @@ public:
     Dimensions &dim = sys_.dimensions();
     double dt = settings_.dt();
     int pbc = settings_.hasPbc();
+    int tn = settings_.threads();
     
     const double lx = dim.sizeX();
     const double ly = dim.sizeY();
     const double lz = dim.sizeZ();
 
-    #pragma clang loop vectorize(enable)
+    #pragma omp simd
     for (size_t i = 0; i < particles.size(); ++i) {
       particles.coord_x_[i] += particles.velocity_x_[i] * dt;
       particles.coord_y_[i] += particles.velocity_y_[i] * dt;
@@ -71,7 +72,6 @@ public:
       particles.coord_y_[i] -= pbc * ly * std::floor(particles.coord_y_[i] / ly);
       particles.coord_z_[i] -= pbc * lz * std::floor(particles.coord_z_[i] / lz);
     }
-
     //coords_.compute(particles);
     /*
     for(int i=0;i<pn;i++){
@@ -106,9 +106,10 @@ public:
     timer.start();
     Particles &particles = sys_.particles();
     double mt = settings_.dt() / (2 * settings_.mass());
+    int tn = settings_.threads();
     //int pn = particles.size();
     //vels_.compute(particles);
-    #pragma clang loop vectorize(enable)
+    #pragma omp simd
     for (size_t i = 0; i < particles.size(); ++i) {
       particles.velocity_x_[i] += particles.force_x_[i]*mt;
       particles.velocity_y_[i] += particles.force_y_[i]*mt;
@@ -138,11 +139,14 @@ public:
     timer.stop();
     std::cout<<"Velocity elapsed time: "<<timer.elapsed()<<" ms"<<std::endl;
   }
-  template<typename Potential>
-  void CalculateForces(System &sys_, Potential &pot_) {
+  
+  void CalculateEAM(System &sys_, EAM &pot_) {
     Dimensions &dim = sys_.dimensions();
     Particles &particles = sys_.particles();
-    int pn = particles.size();
+    const int pn = particles.size();
+
+    double lx = dim.sizeX(), ly = dim.sizeY(), lz = dim.sizeZ();
+    double inv_lx = 1/dim.sizeX(), inv_ly = 1/dim.sizeY(), inv_lz = 1/dim.sizeZ();
 
     double* __restrict__ x_ = particles.coord_x_.data();
     double* __restrict__ y_ = particles.coord_y_.data();
@@ -173,173 +177,174 @@ public:
     Timer timer{1};
     timer.start();
     cell_list_.rebuild(pot_.getRcut(), dim.sizeX(), dim.sizeY(), dim.sizeZ());
-    //CellList cellList(force_.getCutOff(), dim.sizeX(), dim.sizeY(), dim.sizeZ());
-    //std::cout << cell_list_.getData() << std::endl;
     cell_list_.distribute_particles(particles);
+    int nmax = cell_list_.maxNeighborsCount();
     timer.stop();
     std::cout<<"Cell list build elapsed time: "<<timer.elapsed()<<" ms"<<std::endl;
     
-    
-    std::vector<int> neighbors;
-    neighbors.resize(pn);
+
+    int tn = settings_.threads();
     int pbc = settings_.hasPbc();
-    int ns = 0;
 
-    double dx = 0.0, dy = 0.0 , dz = 0.0;
-    double fx = 0.0, fy = 0.0, fz = 0.0;
-    double vxx = 0.0, vxy = 0.0,vxz = 0.0;
-    double vyx = 0.0, vyy = 0.0,vyz = 0.0;
-    double vzx = 0.0, vzy = 0.0,vzz = 0.0;
-
-    double lx = dim.sizeX(), ly = dim.sizeY(), lz = dim.sizeZ();
-    double inv_lx = 1/dim.sizeX(), inv_ly = 1/dim.sizeY(), inv_lz = 1/dim.sizeZ();
-    double length,lengthSqr;
-    double U = 0,FU = 0;
-    double mu,rho_f;
-
-    if (pot_.getPotentialType() == Potential::PotentialType::EAM) {
       timer.start();
       // Предрасчеты для потенциала EAM
-      for (int i = 0; i < pn; i++) {
-        mu = 0.0, rho_f = 0.0;
-        ns = cell_list_.getNeighbors(neighbors, particles, i, pbc);
-        // Векторизация по соседям
-        #pragma omp simd reduction(+:mu, rho_f)
-        for (int j = 0;j < ns;j++) {
-          int ni = neighbors[j];
-          //Векторное расстояние
-          double dx = x_[i] - x_[ni];
-          double dy = y_[i] - y_[ni];
-          double dz = z_[i] - z_[ni];
-          // Отражение частицы
-          dx -= pbc * lx * (long long)(dx * inv_lx + (dx >= 0 ? 0.5 : -0.5));
-          dy -= pbc * ly * (long long)(dy * inv_ly + (dy >= 0 ? 0.5 : -0.5));
-          dz -= pbc * lz * (long long)(dz * inv_lz + (dz >= 0 ? 0.5 : -0.5));
-          //Расстояние между частицами
-          double r2 = dx*dx + dy*dy + dz*dz;
-          double r  = sqrt(r2);
-          //Расчеты ЕАМ
-          mu += pot_.getPairPart(length);
-          rho_f += pot_.getDensityPart(length);
+      #pragma omp parallel num_threads(tn)
+      {
+        std::vector<int> neighbors;
+        neighbors.resize(nmax);
+
+        #pragma omp for schedule(dynamic)
+        for (int i = 0; i < pn; i++) {
+          double mu = 0.0, rho_f = 0.0;
+          int ns = cell_list_.getNeighbors(neighbors, particles, i, pbc);
+          if(ns > nmax){
+          std::cout << "Max n_count = "<<nmax<<std::endl;
+          std::cout << "Current n_count = "<<ns<<std::endl;
+          }
+          // Векторизация по соседям
+          #pragma omp simd reduction(+:mu, rho_f)
+          for (int j = 0;j < ns;j++) {
+            int ni = neighbors[j];
+            //Векторное расстояние
+            double dx = x_[i] - x_[ni];
+            double dy = y_[i] - y_[ni];
+            double dz = z_[i] - z_[ni];
+            // Отражение частицы
+            dx -= pbc * lx * nearbyint(dx * inv_lx);
+            dy -= pbc * ly * nearbyint(dy * inv_ly);
+            dz -= pbc * lz * nearbyint(dz * inv_lz);
+            //Расстояние между частицами
+            double r2 = dx*dx + dy*dy + dz*dz;
+            double r  = sqrt(r2);
+            //Расчеты ЕАМ
+            double pp = pot_.mu(r);
+            double dp = pot_.rho_f(r);
+          }
+          ed_[i] = rho_f;
+          pp_[i] = mu;
         }
-        ed_[i] = rho_f;
-        pp_[i] = mu;
       }
       timer.stop();
       std::cout<<"Precalc EAM time elapsed " << timer.elapsed() << " ms" << std::endl;
       // Основной блок расчетов
       timer.start();
-      for (int i = 0; i < pn; i++) {
-        //Обнуление сил и вириалов
-        fx = 0.0,fy = 0.0,fz = 0.0;
-        vxx = 0.0, vxy = 0.0, vxz = 0.0;
-        vyx = 0.0, vyy = 0.0, vyz = 0.0;
-        vzx = 0.0, vzy = 0.0, vzz = 0.0;
+      #pragma omp parallel num_threads(tn)
+      {
+        std::vector<int> neighbors;
+        neighbors.resize(nmax);
 
-        ns = cell_list_.getNeighbors(neighbors, particles,i, pbc);
+        #pragma omp for schedule(dynamic)
+        for (int i = 0; i < pn; i++) {
+          //Обнуление сил и вириалов
+          double fx = 0.0,fy = 0.0, fz = 0.0;
+          double vxx = 0.0, vxy = 0.0, vxz = 0.0;
+          double vyx = 0.0, vyy = 0.0, vyz = 0.0;
+          double vzx = 0.0, vzy = 0.0, vzz = 0.0;
 
-        #pragma omp simd reduction(+:fx, fy, fz, vxx, vxy, vxz, vyx, vyy, vyz, vzx, vzy, vzz)
-        for (int j = 0; j < ns;j++) {
-          //Сосед
-          int ni = neighbors[j];
-          //Векторное расстояние
-          double dx = x_[i] - x_[ni];
-          double dy = y_[i] - y_[ni];
-          double dz = z_[i] - z_[ni];
-          // Отражение частицы
-          dx -= pbc * lx * (long long)(dx * inv_lx + (dx >= 0 ? 0.5 : -0.5));
-          dy -= pbc * ly * (long long)(dy * inv_ly + (dy >= 0 ? 0.5 : -0.5));
-          dz -= pbc * lz * (long long)(dz * inv_lz + (dz >= 0 ? 0.5 : -0.5));
-          //Расстояние между частицами
-          double r2 = dx*dx + dy*dy + dz*dz;
-          double r  = sqrt(r2);
-          //Сила потенциала
-          double FU = pot_.getFU(ed_[i], ed_[ni], r);    
-           
-          double Fx = dx * FU / r;
-          double Fy = dy * FU / r;
-          double Fz = dz * FU / r;
+          int ns = cell_list_.getNeighbors(neighbors, particles,i, pbc);
+          //#pragma omp simd reduction(+:fx, fy, fz, vxx, vxy, vxz, vyx, vyy, vyz, vzx, vzy, vzz)
+          for (int j = 0; j < ns;j++) {
+            //Сосед
+            int ni = neighbors[j];
+            //Векторное расстояние
+            double dx = x_[i] - x_[ni];
+            double dy = y_[i] - y_[ni];
+            double dz = z_[i] - z_[ni];
+            // Отражение частицы
+            dx -= pbc * lx * (long long)(dx * inv_lx + (dx >= 0 ? 0.5 : -0.5));
+            dy -= pbc * ly * (long long)(dy * inv_ly + (dy >= 0 ? 0.5 : -0.5));
+            dz -= pbc * lz * (long long)(dz * inv_lz + (dz >= 0 ? 0.5 : -0.5));
+            //Расстояние между частицами
+            double r2 = dx*dx + dy*dy + dz*dz;
+            double r  = sqrt(r2);
+            //Сила потенциала
+            double FU = pot_.getFU(ed_[i], ed_[ni], r);    
 
-          fx += Fx; fy += Fy; fz += Fz;
-          vxx += dx*Fx; vxy += dx*Fy; vxz += dx*Fz;
-          vyx += dy*Fx; vyy += dy*Fy; vyz += dy*Fz;
-          vzx += dz*Fx; vzy += dz*Fy; vzz += dz*Fz;
+            double Fx = dx * FU / r;
+            double Fy = dy * FU / r;
+            double Fz = dz * FU / r;
+
+            fx += Fx; fy += Fy; fz += Fz;
+            vxx += dx*Fx; vxy += dx*Fy; vxz += dx*Fz;
+            vyx += dy*Fx; vyy += dy*Fy; vyz += dy*Fz;
+            vzx += dz*Fx; vzy += dz*Fy; vzz += dz*Fz;
+          }
+          epot_[i] = pot_.getU(ed_[i], pp_[i]);
+          fx_[i] = fx; fy_[i] = fy; fz_[i] = fz;
+          vxx_[i] = vxx; vxy_[i] = vxy; vxz_[i] = vxz;
+          vyx_[i] = vyx; vyy_[i] = vyy; vyz_[i] = vyz;
+          vzx_[i] = vzx; vzy_[i] = vzy; vzz_[i] = vzz;
+
         }
-        epot_[i] = pot_.getU(ed_[i], pp_[i]);
-        fx_[i] = fx;
-        fy_[i] = fy;
-        fz_[i] = fz;
-        vxx_[i] = vxx;
-        vxy_[i] = vxy;
-        vxz_[i] = vxz;
-        vyx_[i] = vyx;
-        vyy_[i] = vyy;
-        vyz_[i] = vyz;
-        vzx_[i] = vzx;
-        vzy_[i] = vzy;
-        vzz_[i] = vzz;
       }
       timer.stop();
       std::cout<<"Main EAM time elapsed " << timer.elapsed() << " ms" << std::endl;
-    }
+    
     // Основной блок расчетов
+    /*
     if (pot_.getPotentialType() == Potential::PotentialType::LJ) {
-      for (int i = 0; i < pn; i++) {
-        //Обнуление сил и вириалов
-        particles.e_pot_[i] = 0.0;
-        particles.force_x_[i] = 0.0;
-        particles.force_y_[i] = 0.0;
-        particles.force_z_[i] = 0.0;
-        particles.virial_xx_[i] = 0.0;
-        particles.virial_xy_[i] = 0.0;
-        particles.virial_xz_[i] = 0.0;
-        particles.virial_yx_[i] = 0.0;
-        particles.virial_yy_[i] = 0.0;
-        particles.virial_yz_[i] = 0.0;
-        particles.virial_zx_[i] = 0.0;
-        particles.virial_zy_[i] = 0.0;
-        particles.virial_zz_[i] = 0.0;
+      #pragma omp parallel num_threads(tn)
+      {
+        std::vector<int> neighbors;
+        neighbors.resize(cell_list_.maxNeighborsCount());
 
-        ns = cell_list_.getNeighbors(neighbors, particles, i, settings_.hasPbc());
-        //std::cout << "Neighbors count for particle "<<i<<" : "<<neighbors.size() << std::endl;
-        for (int j = 0; j < ns;j++) {
-          int ni = neighbors[j];
-          
-          dx = particles.coord_x_[i] - particles.coord_x_[ni];
-          dy = particles.coord_y_[i] - particles.coord_y_[ni];
-          dz = particles.coord_z_[i] - particles.coord_z_[ni];
+        double e_pot;
+        double fx,fy,fz;
+        double vxx, vxy, vxz;
+        double vyx, vyy, vyz;
+        double vzx, vzy, vzz;
+        #pragma omp for schedule(dynamic)
+        for (int i = 0; i < pn; i++) {
+          //Обнуление сил и вириалов
+          e_pot = 0.0;
+          fx = fy = fz = 0.0;
+          vxx = vxy = vxz = vyx = vyy = vyz = vzx = vzy = vzz = 0.0;
 
-          // Отражение частицы
-          dx -= pbc * lx * std::nearbyint(dx * inv_lx);
-          dy -= pbc * ly * std::nearbyint(dy * inv_ly);
-          dz -= pbc * lz * std::nearbyint(dz * inv_lz);
+          int ns = cell_list_.getNeighbors(neighbors, particles, i, settings_.hasPbc());
+          //std::cout << "Neighbors count for particle "<<i<<" : "<<neighbors.size() << std::endl;
+          //#pragma omp simd reduction(+:e_pot, fx, fy, fz, vxx, vxy, vxz, vyx, vyy, vyz, vzx, vzy, vzz)
+          for (int j = 0; j < ns;j++) {
+            int ni = neighbors[j];
 
-          lengthSqr = dx*dx + dy*dy + dz*dz;
-          if (lengthSqr > pot_.getSqrRcut())
-            continue;
-          length = std::sqrt(lengthSqr);
-          PotentialResult res = pot_.getAll(lengthSqr);
-          // U = potential_->getU(lengthSqr);
-          // FU = potential_->getFU(lengthSqr);
-          U = res.u / 2;
-          FU = res.fu;
-          
-          particles.e_pot_[i] += U;
-          particles.force_x_[i] += dx * FU / length;
-          particles.force_y_[i] += dy * FU / length;
-          particles.force_z_[i] += dz * FU / length;
-          particles.virial_xx_[i] += dx * particles.force_x_[i];
-          particles.virial_xy_[i] += dx * particles.force_y_[i];
-          particles.virial_xz_[i] += dx * particles.force_z_[i];
-          particles.virial_yx_[i] += dy * particles.force_x_[i];
-          particles.virial_yy_[i] += dy * particles.force_y_[i];
-          particles.virial_yz_[i] += dy * particles.force_z_[i];
-          particles.virial_zx_[i] += dz * particles.force_x_[i];
-          particles.virial_zy_[i] += dz * particles.force_y_[i];
-          particles.virial_zz_[i] += dz * particles.force_z_[i];
+            double dx = x_[i] - x_[ni];
+            double dy = y_[i] - y_[ni];
+            double dz = z_[i] - z_[ni];
+
+            // Отражение частицы
+            dx -= pbc * lx * std::nearbyint(dx * inv_lx);
+            dy -= pbc * ly * std::nearbyint(dy * inv_ly);
+            dz -= pbc * lz * std::nearbyint(dz * inv_lz);
+
+            double r2 = dx*dx + dy*dy + dz*dz;
+            double r = std::sqrt(r2);
+            PotentialResult res = pot_.getAll(r);
+            // U = potential_->getU(lengthSqr);
+            // FU = potential_->getFU(lengthSqr);
+            double U = res.u / 2;
+            double FU = res.fu;
+
+            double Fx = dx * FU / r;
+            double Fy = dy * FU / r;
+            double Fz = dz * FU / r;
+
+            e_pot += U;
+            fx += Fx;
+            fy += Fy;
+            fz += Fz;
+            vxx += dx * Fx; vxy += dx * Fy; vxz += dx * Fz;
+            vyx += dy * Fx; vyy += dy * Fy; vyz += dy * Fz;
+            vzx += dz * Fx; vzy += dz * Fy; vzz += dz * Fz;
+          }
+
+          epot_[i] = e_pot;
+          fx_[i] = fx; fy_[i] = fy; fz_[i] = fz;
+          vxx_[i] = vxx; vxy_[i] = vxy; vxz_[i] = vxz;
+          vyx_[i] = vyx; vyy_[i] = vyy; vyz_[i] = vyz;
+          vzx_[i] = vzx; vzy_[i] = vzy; vzz_[i] = vzz;
         }
       }
     }
+    */
   }
 
   void initialStep(System &sys_) {
@@ -347,10 +352,10 @@ public:
     // Расчет сил
     switch (potential_->getPotentialType()) {
     case Potential::PotentialType::EAM:
-      CalculateForces(sys_, *static_cast<EAM*>(potential_.get()));
+      CalculateEAM(sys_, *static_cast<EAM*>(potential_.get()));
       break;
     case Potential::PotentialType::LJ:
-      CalculateForces(sys_, *static_cast<LJ*>(potential_.get()));
+      //CalculateForces(sys_, *static_cast<LJ*>(potential_.get()));
       break;
     default:
       throw std::invalid_argument("Unknown potential");
@@ -400,10 +405,10 @@ public:
     // Расчет сил
     switch (potential_->getPotentialType()) {
     case Potential::PotentialType::EAM:
-      CalculateForces(sys_, *static_cast<EAM*>(potential_.get()));
+      CalculateEAM(sys_, *static_cast<EAM*>(potential_.get()));
       break;
     case Potential::PotentialType::LJ:
-      CalculateForces(sys_, *static_cast<LJ*>(potential_.get()));
+      //CalculateForces(sys_, *static_cast<LJ*>(potential_.get()));
       break;
     default:
       throw std::invalid_argument("Unknown potential");

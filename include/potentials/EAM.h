@@ -13,10 +13,11 @@
 using json = nlohmann::json;
 // EAM
 class EAM : public Potential {
-private:
+public:
   const PotentialType type_{PotentialType::EAM};
 
   const double r_e_;
+  const double inv_r_e_;
   const double f_e_;
   const double rho_e_;
   const double rho_s_;
@@ -32,51 +33,62 @@ private:
   const double k_;
   const double lambda_;
   const double eta_;
-  const double m_;
-  const double n_;
+  const int m_;
+  const int n_;
   const double energy_unit_;
   const double r_cut_;
   const double r_cut_sqr_;
 
   inline double rho_f(double r) const {
-    double r_over_R_e = r / r_e_;
+    double r_over_R_e = r * inv_r_e_;
+
     double exp_term = exp(-beta_ * (r_over_R_e - 1));
-    double pow_term = pow(r_over_R_e - lambda_, n_);
+    double pow_term = my_pow_n(r_over_R_e - lambda_,n_);
+
     return (f_e_ * exp_term) / (1 + pow_term);
   }
+  
   inline double d_rho_f(double r) const {
-    double r_over_Re = r / r_e_;
+    double r_over_Re = r * inv_r_e_;
+
     double exp_term = exp(-beta_ * (r_over_Re - 1));
-    double pow_term = pow(r_over_Re - lambda_, n_);
-    double var1 = (-beta_ / r_e_) * exp_term * (1 + pow_term);
-    double var2 = (n_ / r_e_) * pow(r_over_Re - lambda_, n_ - 1) * exp_term;
+    double pow_term = my_pow_n(r_over_Re - lambda_, n_);
+
+    double var1 = (-beta_ * inv_r_e_) * exp_term * (1 + pow_term);
+    double var2 = (n_ * inv_r_e_) * my_pow_n(r_over_Re - lambda_, n_ - 1) * exp_term;
     double var3 = 1 + pow_term;
+
     return f_e_ * (var1 - var2) / (var3 * var3);
   }
 
   inline double mu(double r) const {
-    double r_over_Re = r / r_e_;
+    double r_over_Re = r * inv_r_e_;
+
     double exp_term1 = exp(-alpha_ * (r_over_Re - 1));
-    double pow_term1 = pow(r_over_Re - k_, m_);
+    double pow_term1 = my_pow_n(r_over_Re - k_,m_);
+
     double exp_term2 = exp(-beta_ * (r_over_Re - 1));
-    double pow_term2 = pow(r_over_Re - lambda_, n_);
+    double pow_term2 = my_pow_n(r_over_Re - lambda_,n_);
 
     return (a_ * exp_term1 / (1 + pow_term1)) -
            (b_ * exp_term2 / (1 + pow_term2));
   }
   inline double d_mu(double r) const {
-    double r_over_Re = r / r_e_;
+    double r_over_Re = r * inv_r_e_;
+
     double exp_term1 = exp(-alpha_ * (r_over_Re - 1));
-    double pow_term1 = pow(r_over_Re - k_, m_);
-    double var11 = (-a_ * alpha_ / r_e_) * exp_term1 * (1 + pow_term1);
-    double var12 = (m_ / r_e_) * pow(r_over_Re - k_, m_ - 1) * a_ * exp_term1;
+    double pow_term1 = my_pow_n(r_over_Re - k_,m_);
+
+    double var11 = (-a_ * alpha_ * inv_r_e_) * exp_term1 * (1 + pow_term1);
+    double var12 = (m_ * inv_r_e_) * my_pow_n(r_over_Re - k_, m_ - 1) * a_ * exp_term1;
     double var1 = (var11 - var12) / ((1 + pow_term1) * (1 + pow_term1));
 
     double exp_term2 = exp(-beta_ * (r_over_Re - 1));
-    double pow_term2 = pow(r_over_Re - lambda_, n_);
+    double pow_term2 = my_pow_n(r_over_Re - lambda_,n_);
+    
     double var21 =
-        (n_ / r_e_) * pow(r_over_Re - lambda_, n_ - 1) * b_ * exp_term2;
-    double var22 = (-b_ * beta_ / r_e_) * exp_term2 * (1 + pow_term2);
+        (n_ * inv_r_e_) * my_pow_n(r_over_Re - lambda_, n_ - 1) * b_ * exp_term2;
+    double var22 = (-b_ * beta_ * inv_r_e_) * exp_term2 * (1 + pow_term2);
     double var2 = (var21 - var22) / ((1 + pow_term2) * (1 + pow_term2));
 
     return var1 + var2;
@@ -134,17 +146,17 @@ private:
 
   inline double om3(double rho) const {
     double rho_over_RHO_s = rho / rho_s_;
-    double pow_term = pow(rho_over_RHO_s, eta_);
+    double pow_term = my_pow_n(rho_over_RHO_s, eta_);
     double log_term = log(pow_term);
 
     return om_e_ * (1 - log_term) * pow_term;
   }
   inline double d_om3(double rho) const {
     double rho_over_RHO_s = rho / rho_s_;
-    double pow_term = pow(rho_over_RHO_s, eta_);
+    double pow_term = my_pow_n(rho_over_RHO_s, eta_);
     double log_term = log(pow_term);
 
-    return -om_e_ * eta_ * pow(rho_over_RHO_s, eta_ - 1) * log_term / rho_s_;
+    return -om_e_ * eta_ * my_pow_n(rho_over_RHO_s, eta_ - 1) * log_term / rho_s_;
   }
 
   inline double om(double rho) const {
@@ -165,11 +177,17 @@ private:
     return d_om2(rho);
   }
 
+  inline double my_pow_n(double x, int n) const {
+    double res = 1.0;
+    for (int i=0; i<n; ++i) res *= x;
+    return res;
+  }
 public:
   ~EAM() = default;
 
   EAM(json &params_json)
       : r_e_(params_json.value("r_e", 0.0)),
+        inv_r_e_(1/r_e_),
         f_e_(params_json.value("f_e", 0.0)),
         rho_e_(params_json.value("rho_e", 0.0)),
         rho_s_(params_json.value("rho_s", 0.0)), rho_n_(rho_e_ * 0.85),
@@ -180,8 +198,9 @@ public:
         beta_(params_json.value("beta", 0.0)), a_(params_json.value("a", 0.0)),
         b_(params_json.value("b", 0.0)), k_(params_json.value("k", 0.0)),
         lambda_(params_json.value("lambda", 0.0)),
-        eta_(params_json.value("eta", 0.0)), m_(params_json.value("m", 0.0)),
-        n_(params_json.value("n", 0.0)),
+        eta_(params_json.value("eta", 0.0)), 
+        m_(params_json.value("m", 0)),
+        n_(params_json.value("n", 0)),
         energy_unit_(params_json.value("energy_unit", 0.0)),
         r_cut_(params_json.value("r_cut", 0.0)), r_cut_sqr_(r_cut_ * r_cut_) {};
 

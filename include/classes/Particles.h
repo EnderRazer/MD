@@ -5,6 +5,10 @@
 #include <iostream>
 #include <vector>
 
+#include "AlignedAllocator.h"
+
+using AlignedVector = std::vector<double, AlignedAllocator<double, 64>>;
+
 struct ForceCalcValues {
   int interaction_count{0};
   double rVec_x{0}, rVec_y{0}, rVec_z{0};
@@ -21,34 +25,34 @@ struct ForceCalcValues {
 class Particles {
 public:
   size_t N{};
-  std::vector<double> mass_{}; // Particle mass
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  mass_{}; // Particle mass
 
   // Position (coordinate)
-  std::vector<double> coord_x_{}, coord_y_{}, coord_z_{};   
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>> coord_x_, coord_y_, coord_z_;   
 
   // Velocity
-  std::vector<double> velocity_x_{}, velocity_y_{}, velocity_z_{}; 
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  velocity_x_{}, velocity_y_{}, velocity_z_{}; 
 
   // Force acting on the particle
-  std::vector<double> force_x_{}, force_y_{}, force_z_{};    
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  force_x_{}, force_y_{}, force_z_{};    
 
   // Virials (3x3 matrix)
-  std::vector<double> virial_xx_{}, virial_xy_{}, virial_xz_{};
-  std::vector<double> virial_yx_{}, virial_yy_{}, virial_yz_{};
-  std::vector<double> virial_zx_{}, virial_zy_{}, virial_zz_{};
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  virial_xx_{}, virial_xy_{}, virial_xz_{};
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  virial_yx_{}, virial_yy_{}, virial_yz_{};
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  virial_zx_{}, virial_zy_{}, virial_zz_{};
 
   // Energies
-  std::vector<double> e_pot_{},e_kin_{},e_int_{},e_term_{},e_full_{};
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  e_pot_{},e_kin_{},e_int_{},e_term_{},e_full_{};
 
   // Pulse of the particle 
-  std::vector<double> pulse_{}; 
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  pulse_{}; 
 
   // EAM Properties
   // Electron density of the particle
-  std::vector<double> electron_density_{}; 
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  electron_density_{}; 
 
   // Pair potential energy of the particle
-  std::vector<double> pair_potential_{};   
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  pair_potential_{};   
 public:
   // Default constructor: Initializes everything to zero.
   Particles() = default;
@@ -177,7 +181,7 @@ public:
     }
   }
   //Геттеры
-  size_t size() const { return N; }
+  constexpr size_t size() const { return N; }
   //Масса
   inline double& mass(size_t i) { return mass_[i]; }
   inline const double& mass(size_t i) const { return mass_[i]; }

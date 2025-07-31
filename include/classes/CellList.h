@@ -1,8 +1,10 @@
 #ifndef CELL_LIST_H
 #define CELL_LIST_H
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <ostream>
 #include <sstream>
 
 #include "classes/Particles.h"
@@ -40,7 +42,6 @@ public:
       int cellIdx = getCellIndex(particles.coordX(i), particles.coordY(i), particles.coordZ(i));
       ++cell_counts_[cellIdx];
     }
-
     // 3. Построение offset-таблицы
     cell_offsets_.resize(totalCells_ + 1);  // +1 для удобства границы
     cell_offsets_[0] = 0;
@@ -55,6 +56,10 @@ public:
       int cellIdx = getCellIndex(particles.coordX(i), particles.coordY(i), particles.coordZ(i));
       flat_cells_[current_offsets[cellIdx]++] = i;
     }
+  }
+
+  int maxNeighborsCount() {
+    return *std::max_element(cell_counts_.begin(),cell_counts_.end())*27;
   }
 
   int getNeighbors(std::vector<int>&neighbors, Particles &particles, const int index, bool pbc) const {
@@ -85,6 +90,7 @@ public:
             ((unsigned)(cy + dy) < (unsigned)num_cells_y_) &
             ((unsigned)(cz + dz) < (unsigned)num_cells_z_);
           if (!pbc && !inside) continue;
+
           nx = (cx + dx + num_cells_x_) % num_cells_x_;
           ny = (cy + dy + num_cells_y_) % num_cells_y_;
           nz = (cz + dz + num_cells_z_) % num_cells_z_;
@@ -93,7 +99,7 @@ public:
           // NEW with distance check aka Verlet List
           start = cell_offsets_[nId], end = cell_offsets_[nId + 1];
 
-          #pragma omp simd reduction(+:count)
+          #pragma omp parallel for
           for (size_t k = start; k < end; ++k) {
             j = flat_cells_[k];
             

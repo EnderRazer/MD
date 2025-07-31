@@ -56,7 +56,7 @@
     "pbc": false,
     "profiling": false,
     "start_temp": 2.7315,
-    "threads": 1
+    "threads": 8
   },
   "material": {
     "mass": 97.463,
