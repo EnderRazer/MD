@@ -17,4 +17,9 @@ struct AlignedAllocator {
         return reinterpret_cast<T*>(ptr);
     }
     void deallocate(T* p, size_t) noexcept { free(p); }
+
+    bool operator==(const AlignedAllocator&) const noexcept { return true; }
+    bool operator!=(const AlignedAllocator&) const noexcept { return false; }
+
+    using propagate_on_container_swap = std::true_type;
 };
