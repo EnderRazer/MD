@@ -26,9 +26,9 @@ private:
           coord_y = y + offset_y;
           coord_z = z + offset_z;
           
-          particles.coordX(count) = coord_x*crist_length;
-          particles.coordY(count) = coord_y*crist_length;
-          particles.coordZ(count) = coord_z*crist_length;
+          particles.coord_x_[count] = coord_x*crist_length;
+          particles.coord_y_[count] = coord_y*crist_length;
+          particles.coord_z_[count] = coord_z*crist_length;
           count++;
         }
       }
@@ -112,13 +112,13 @@ private:
     sys.particles().resize(size);
     Particles &particles = sys.particles();
     for (int i = 0; i < size; i++) {
-      particles.coordX(i) = layouts[i].coord_x;
-      particles.coordY(i) = layouts[i].coord_y;
-      particles.coordZ(i) = layouts[i].coord_z;
+      particles.coord_x_[i] = layouts[i].coord_x;
+      particles.coord_y_[i] = layouts[i].coord_y;
+      particles.coord_z_[i] = layouts[i].coord_z;
 
-      particles.velocityX(i) = layouts[i].velocity_x;
-      particles.velocityY(i) = layouts[i].velocity_y;
-      particles.velocityZ(i) = layouts[i].velocity_z;
+      particles.velocity_x_[i] = layouts[i].velocity_x;
+      particles.velocity_y_[i] = layouts[i].velocity_y;
+      particles.velocity_z_[i] = layouts[i].velocity_z;
     }
     
     std::cout << sys.getParticlesCoordsInfo() << std::endl;

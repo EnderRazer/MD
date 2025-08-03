@@ -45,7 +45,8 @@
       "m": 20,
       "n": 20,
       "energy_unit": 160.218,
-      "r_cut": 0.9
+      "r_cut": 0.9,
+      "interpolation_dr": 0.00001
     },
     "type": "EAM"
   },

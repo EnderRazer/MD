@@ -1,7 +1,9 @@
 #ifndef POTENTIAL_EAM
 #define POTENTIAL_EAM
 
+#include <ostream>
 #include <sstream>
+#include <vector>
 
 #include "nlohmann/json.hpp"
 
@@ -39,6 +41,22 @@ public:
   const double r_cut_;
   const double r_cut_sqr_;
 
+  const double precision_;
+
+  std::vector<double>t_rho_f_;
+  std::vector<double>t_d_rho_f_;
+  std::vector<double>t_mu_;
+  std::vector<double>t_d_mu_;
+
+  std::vector<double>t_om1_;
+  std::vector<double>t_d_om1_;
+
+  std::vector<double>t_om2_;
+  std::vector<double>t_d_om2_;
+
+  std::vector<double>t_om3_;
+  std::vector<double>t_d_om3_;
+
   inline double rho_f(double r) const {
     double r_over_R_e = r * inv_r_e_;
 
@@ -46,6 +64,14 @@ public:
     double pow_term = my_pow_n(r_over_R_e - lambda_,n_);
 
     return (f_e_ * exp_term) / (1 + pow_term);
+  }
+  inline double int_rho_f(double r) const {
+    double idx = r / precision_;
+    int i = static_cast<int>(idx);
+
+    if (i >= t_rho_f_.size() - 1) return 0;
+    double frac = idx - i;
+    return t_rho_f_[i] + frac * (t_rho_f_[i + 1] - t_rho_f_[i]);
   }
   
   inline double d_rho_f(double r) const {
@@ -60,6 +86,14 @@ public:
 
     return f_e_ * (var1 - var2) / (var3 * var3);
   }
+  inline double int_d_rho_f(double r) const {
+    double idx = r / precision_;
+    int i = static_cast<int>(idx);
+
+    if (i >= t_d_rho_f_.size() - 1) return 0;
+    double frac = idx - i;
+    return t_d_rho_f_[i] + frac * (t_d_rho_f_[i + 1] - t_d_rho_f_[i]);
+  }
 
   inline double mu(double r) const {
     double r_over_Re = r * inv_r_e_;
@@ -73,6 +107,15 @@ public:
     return (a_ * exp_term1 / (1 + pow_term1)) -
            (b_ * exp_term2 / (1 + pow_term2));
   }
+  inline double int_mu(double r) const {
+    double idx = r / precision_;
+    int i = static_cast<int>(idx);
+
+    if (i >= t_mu_.size() - 1) return 0;
+    double frac = idx - i;
+    return t_mu_[i] + frac * (t_mu_[i + 1] - t_mu_[i]);
+  }
+
   inline double d_mu(double r) const {
     double r_over_Re = r * inv_r_e_;
 
@@ -92,6 +135,14 @@ public:
     double var2 = (var21 - var22) / ((1 + pow_term2) * (1 + pow_term2));
 
     return var1 + var2;
+  }
+  inline double int_d_mu(double r) const {
+    double idx = r / precision_;
+    int i = static_cast<int>(idx);
+
+    if (i >= t_d_mu_.size() - 1) return 0;
+    double frac = idx - i;
+    return t_d_mu_[i] + frac * (t_d_mu_[i + 1] - t_d_mu_[i]);
   }
 
   inline double om1(double rho) const {
@@ -177,11 +228,14 @@ public:
     return d_om2(rho);
   }
 
+  #pragma omp declare simd
   inline double my_pow_n(double x, int n) const {
     double res = 1.0;
     for (int i=0; i<n; ++i) res *= x;
     return res;
   }
+
+
 public:
   ~EAM() = default;
 
@@ -202,7 +256,40 @@ public:
         m_(params_json.value("m", 0)),
         n_(params_json.value("n", 0)),
         energy_unit_(params_json.value("energy_unit", 0.0)),
-        r_cut_(params_json.value("r_cut", 0.0)), r_cut_sqr_(r_cut_ * r_cut_) {};
+        r_cut_(params_json.value("r_cut", 0.0)),
+        r_cut_sqr_(r_cut_ * r_cut_),
+        precision_(params_json.value("interpolation_dr", 0.0)) {
+          int size = r_cut_/precision_;
+          std::cout<<"Заполнение табличных значений"
+            <<"\n\tТочность: "<<precision_
+            <<"\n\tКоличество записей: "<<size
+            <<std::endl;
+
+          t_rho_f_.reserve(size);
+          t_d_rho_f_.reserve(size);
+
+          t_mu_.reserve(size);
+          t_d_mu_.reserve(size);
+
+          t_om1_.reserve(size);
+          t_d_om1_.reserve(size);
+
+          t_om2_.reserve(size);
+          t_d_om2_.reserve(size);
+
+          t_om3_.reserve(size);
+          t_d_om3_.reserve(size);
+
+          for(int i=0;i<size;i++){
+            double r = i*precision_;
+
+            t_rho_f_[i] = rho_f(r);
+            t_d_rho_f_[i] = d_rho_f(r);
+
+            t_mu_[i] = mu(r);
+            t_d_mu_[i] = d_mu(r);
+          }
+        };
 
   inline PotentialType getPotentialType() const override {
     return type_;
@@ -237,6 +324,64 @@ public:
     return -energy_unit_ *
            ((d_om(rho_f_i) + d_om(rho_f_j)) * d_rho_f(r_ij) + d_mu(r_ij));
   };
+
+  inline double getFU_fast_branchless(double rho_f_i, double rho_f_j, double r_ij) const {
+    const double r_over_Re = r_ij * inv_r_e_;
+    const double t1 = r_over_Re - 1.0;
+    const double t_k = r_over_Re - k_;
+    const double t_l = r_over_Re - lambda_;
+
+    const double exp_alpha = exp(-alpha_ * t1);
+    const double exp_beta  = exp(-beta_  * t1);
+
+    const double pow_k_m      = my_pow_n(t_k, m_);
+    const double pow_k_m1     = my_pow_n(t_k, m_ - 1);
+    const double pow_l_n      = my_pow_n(t_l, n_);
+    const double pow_l_n1     = my_pow_n(t_l, n_ - 1);
+
+    // ---------------------------------------------
+    // d_om branchless
+    // ---------------------------------------------
+    auto dom_branchless = [&](double rho) {
+        const double v1 = d_om1(rho);
+        const double v2 = d_om2(rho);
+        const double v3 = d_om3(rho);
+        const double m1 = (rho < rho_n_) ? 1.0 : 0.0;
+        const double m3 = (rho >= rho_0_) ? 1.0 : 0.0;
+        return m1*v1 + (1.0 - m1 - m3)*v2 + m3*v3;
+    };
+
+    const double dom_sum = dom_branchless(rho_f_i) + dom_branchless(rho_f_j);
+
+    // ---------------------------------------------
+    // d_rho_f(r)
+    // ---------------------------------------------
+    const double one_plus_pow_l_n = 1.0 + pow_l_n;
+    const double denom_rho2 = one_plus_pow_l_n * one_plus_pow_l_n;
+
+    const double var1_rho = (-beta_ * inv_r_e_) * exp_beta * one_plus_pow_l_n;
+    const double var2_rho = (n_ * inv_r_e_) * pow_l_n1 * exp_beta;
+
+    const double d_rho_f_val = f_e_ * (var1_rho - var2_rho) / denom_rho2;
+
+    // ---------------------------------------------
+    // d_mu(r)
+    // ---------------------------------------------
+    const double one_plus_pow_k_m = 1.0 + pow_k_m;
+    const double denom_mu1 = one_plus_pow_k_m * one_plus_pow_k_m;
+
+    const double var11 = (-a_ * alpha_ * inv_r_e_) * exp_alpha * one_plus_pow_k_m;
+    const double var12 = (m_ * inv_r_e_) * pow_k_m1 * a_ * exp_alpha;
+    const double var1_mu = (var11 - var12) / denom_mu1;
+
+    const double var21 = (n_ * inv_r_e_) * pow_l_n1 * b_ * exp_beta;
+    const double var22 = (-b_ * beta_ * inv_r_e_) * exp_beta * one_plus_pow_l_n;
+    const double var2_mu = (var21 - var22) / denom_rho2;
+
+    const double d_mu_val = var1_mu + var2_mu;
+
+    return -energy_unit_ * (dom_sum * d_rho_f_val + d_mu_val);
+}
 
   inline double getPairPart(double r) const override { return mu(r); }
   inline double getDensityPart(double r) const override { return rho_f(r); }

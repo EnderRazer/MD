@@ -203,20 +203,20 @@ public:
     for (int i = 0; i< particles.size(); i++) {
       std::vector<double> row = {
           static_cast<double>(i),
-          particles.coordX(i),
-          particles.coordY(i),
-          particles.coordZ(i),
-          particles.velocityX(i),
-          particles.velocityY(i),
-          particles.velocityZ(i),
-          particles.forceX(i),
-          particles.forceY(i),
-          particles.forceZ(i),
-          particles.ePot(i),
-          particles.eKin(i),
-          particles.eTerm(i),
-          particles.eInt(i),
-          particles.eFull(i)
+          particles.coord_x_[i],
+          particles.coord_y_[i],
+          particles.coord_z_[i],
+          particles.velocity_x_[i],
+          particles.velocity_y_[i],
+          particles.velocity_z_[i],
+          particles.force_x_[i],
+          particles.force_y_[i],
+          particles.force_z_[i],
+          particles.e_pot_[i],
+          particles.e_kin_[i],
+          particles.e_term_[i],
+          particles.e_int_[i],
+          particles.e_full_[i]
       };
       data.push_back(row);
     }

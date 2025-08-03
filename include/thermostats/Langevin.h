@@ -77,11 +77,11 @@ public:
     Particles &particles = sys.particles();
     for (int i = 0; i < particles.size(); i++) {
       Ft_x_[i] =
-          -particles.mass(i) * (particles.velocityX(i) - Vs_x_) / tau_t_;
+          -particles.mass_[i] * (particles.velocity_x_[i] - Vs_x_) / tau_t_;
       Ft_y_[i] =
-          -particles.mass(i) * (particles.velocityY(i) - Vs_y_) / tau_t_;
+          -particles.mass_[i] * (particles.velocity_y_[i] - Vs_y_) / tau_t_;
       Ft_z_[i] =
-          -particles.mass(i) * (particles.velocityZ(i) - Vs_z_) / tau_t_;
+          -particles.mass_[i] * (particles.velocity_z_[i] - Vs_z_) / tau_t_;
     }
   };
   void applyTemperatureControl(System &sys) override {
@@ -89,9 +89,9 @@ public:
     LGVN_generateFt(sys);
     Particles &particles = sys.particles();
     for (int i = 0; i < particles.size(); i++) {
-      particles.forceX(i) += 2 * (Fr_x_[i] + Ft_x_[i]);
-      particles.forceY(i) += 2 * (Fr_y_[i] + Ft_y_[i]);
-      particles.forceZ(i) += 2 * (Fr_z_[i] + Ft_z_[i]);
+      particles.force_x_[i] += 2 * (Fr_x_[i] + Ft_x_[i]);
+      particles.force_y_[i] += 2 * (Fr_y_[i] + Ft_y_[i]);
+      particles.force_z_[i] += 2 * (Fr_z_[i] + Ft_z_[i]);
     }
   };
 

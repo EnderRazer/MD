@@ -13,9 +13,9 @@ public:
     int pn = sys.particleNumber();
     Particles &particles = sys.particles();
     for (int i = 0; i < pn; i++) {
-      acfv_x += particles.velocityX(i) * init_vel_x[i];
-      acfv_y += particles.velocityY(i) * init_vel_y[i];
-      acfv_z += particles.velocityZ(i) * init_vel_z[i];
+      acfv_x += particles.velocity_x_[i] * init_vel_x[i];
+      acfv_y += particles.velocity_y_[i] * init_vel_y[i];
+      acfv_z += particles.velocity_z_[i] * init_vel_z[i];
     }
     return (acfv_x + acfv_y + acfv_z);
   }

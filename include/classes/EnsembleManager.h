@@ -102,9 +102,9 @@ private:
     const int pn = sys.particleNumber();
     const Particles &particles = sys.particles();
     for (int j = 0; j < pn; j++) {
-      ens.init_velocity_x_[j] = particles.velocityX(j);
-      ens.init_velocity_y_[j] = particles.velocityY(j);
-      ens.init_velocity_z_[j] = particles.velocityZ(j);
+      ens.init_velocity_x_[j] = particles.velocity_x_[j];
+      ens.init_velocity_y_[j] = particles.velocity_y_[j];
+      ens.init_velocity_z_[j] = particles.velocity_z_[j];
     }
     ens.init_pressure_xx_ = sys.pressureXX();
     ens.init_pressure_xy_ = sys.pressureXY();

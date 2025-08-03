@@ -93,13 +93,13 @@ private:
     Particles &p = sys.particles();  
     for(int i = 0; i < p.size(); i++){
       outFile.write(reinterpret_cast<const char *>(&i), sizeof(int));
-      outFile.write(reinterpret_cast<const char *>(&p.mass(i)), sizeof(double));
-      outFile.write(reinterpret_cast<const char *>(&p.coordX(i)),sizeof(double));
-      outFile.write(reinterpret_cast<const char *>(&p.coordY(i)),sizeof(double));
-      outFile.write(reinterpret_cast<const char *>(&p.coordZ(i)),sizeof(double));
-      outFile.write(reinterpret_cast<const char *>(&p.velocityX(i)),sizeof(double));
-      outFile.write(reinterpret_cast<const char *>(&p.velocityY(i)),sizeof(double));
-      outFile.write(reinterpret_cast<const char *>(&p.velocityZ(i)),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.mass_[i]), sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.coord_x_[i]),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.coord_y_[i]),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.coord_z_[i]),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.velocity_x_[i]),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.velocity_y_[i]),sizeof(double));
+      outFile.write(reinterpret_cast<const char *>(&p.velocity_z_[i]),sizeof(double));
     }
 
     outFile.close();
@@ -172,15 +172,15 @@ private:
       inFile.read(reinterpret_cast<char *>(&velocity_y), sizeof(double));
       inFile.read(reinterpret_cast<char *>(&velocity_z), sizeof(double));
 
-      particles.mass(i) = mass;
+      particles.mass_[i] = mass;
       
-      particles.coordX(i) = coord_x;
-      particles.coordY(i) = coord_y;
-      particles.coordZ(i) = coord_z;
+      particles.coord_x_[i] = coord_x;
+      particles.coord_y_[i] = coord_y;
+      particles.coord_z_[i] = coord_z;
 
-      particles.velocityX(i) = velocity_x;
-      particles.velocityY(i) = velocity_y;
-      particles.velocityZ(i) = velocity_z;
+      particles.velocity_x_[i] = velocity_x;
+      particles.velocity_y_[i] = velocity_y;
+      particles.velocity_z_[i] = velocity_z;
     }
     inFile.close();
     return true;

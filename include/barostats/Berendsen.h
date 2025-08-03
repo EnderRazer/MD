@@ -40,9 +40,9 @@ public:
     Particles &particles = sys.particles();
     int pn = particles.size();
     for (int i = 0; i < pn; i++) {
-      particles.coordX(i) *= mu;
-      particles.coordY(i) *= mu;
-      particles.coordZ(i) *= mu;
+      particles.coord_x_[i] *= mu;
+      particles.coord_y_[i] *= mu;
+      particles.coord_z_[i] *= mu;
     }
 
     Dimensions &dim = sys.dimensions();

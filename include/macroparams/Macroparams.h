@@ -32,38 +32,38 @@ public:
     Particles &particles = sys.particles();
 
     for (int i = 0; i < particles.size(); i++) {
-      sumMV_xx += particles.mass(i) * (particles.velocityX(i) - sys.vcmX()) *
-                    (particles.velocityX(i) - sys.vcmX()); // xx
-      sumMV_xy += particles.mass(i) * (particles.velocityX(i) - sys.vcmX()) *
-                    (particles.velocityY(i) - sys.vcmY()); // xy
-      sumMV_xz += particles.mass(i) * (particles.velocityX(i) - sys.vcmX()) *
-                    (particles.velocityZ(i) - sys.vcmZ()); // xz
+      sumMV_xx += particles.mass_[i] * (particles.velocity_x_[i] - sys.vcmX()) *
+                    (particles.velocity_x_[i] - sys.vcmX()); // xx
+      sumMV_xy += particles.mass_[i] * (particles.velocity_x_[i] - sys.vcmX()) *
+                    (particles.velocity_y_[i] - sys.vcmY()); // xy
+      sumMV_xz += particles.mass_[i] * (particles.velocity_x_[i] - sys.vcmX()) *
+                    (particles.velocity_z_[i] - sys.vcmZ()); // xz
 
-      sumMV_yx += particles.mass(i) * (particles.velocityY(i) - sys.vcmY()) *
-                    (particles.velocityX(i) - sys.vcmX()); // yx
-      sumMV_yy += particles.mass(i) * (particles.velocityY(i) - sys.vcmY()) *
-                    (particles.velocityY(i) - sys.vcmY()); // yy
-      sumMV_yz += particles.mass(i) * (particles.velocityY(i) - sys.vcmY()) *
-                    (particles.velocityZ(i) - sys.vcmZ()); // yz
+      sumMV_yx += particles.mass_[i] * (particles.velocity_y_[i] - sys.vcmY()) *
+                    (particles.velocity_x_[i] - sys.vcmX()); // yx
+      sumMV_yy += particles.mass_[i] * (particles.velocity_y_[i] - sys.vcmY()) *
+                    (particles.velocity_y_[i] - sys.vcmY()); // yy
+      sumMV_yz += particles.mass_[i] * (particles.velocity_y_[i] - sys.vcmY()) *
+                    (particles.velocity_z_[i] - sys.vcmZ()); // yz
 
-      sumMV_zx += particles.mass(i) * (particles.velocityZ(i) - sys.vcmZ()) *
-                    (particles.velocityX(i) - sys.vcmX()); // zx
-      sumMV_zy += particles.mass(i) * (particles.velocityZ(i) - sys.vcmZ()) *
-                    (particles.velocityY(i) - sys.vcmY()); // zy
-      sumMV_zz += particles.mass(i) * (particles.velocityX(i) - sys.vcmX()) *
-                    (particles.velocityZ(i) - sys.vcmZ()); // zz
+      sumMV_zx += particles.mass_[i] * (particles.velocity_z_[i] - sys.vcmZ()) *
+                    (particles.velocity_x_[i] - sys.vcmX()); // zx
+      sumMV_zy += particles.mass_[i] * (particles.velocity_z_[i] - sys.vcmZ()) *
+                    (particles.velocity_y_[i] - sys.vcmY()); // zy
+      sumMV_zz += particles.mass_[i] * (particles.velocity_x_[i] - sys.vcmX()) *
+                    (particles.velocity_z_[i] - sys.vcmZ()); // zz
 
-      sumVirials_xx += particles.virialXX(i);
-      sumVirials_xy += particles.virialXY(i);
-      sumVirials_xz += particles.virialXZ(i);
+      sumVirials_xx += particles.virial_xx_[i];
+      sumVirials_xy += particles.virial_xy_[i];
+      sumVirials_xz += particles.virial_xz_[i];
 
-      sumVirials_yx += particles.virialYX(i);
-      sumVirials_yy += particles.virialYY(i);
-      sumVirials_yz += particles.virialYZ(i);
+      sumVirials_yx += particles.virial_yx_[i];
+      sumVirials_yy += particles.virial_yy_[i];
+      sumVirials_yz += particles.virial_yz_[i];
 
-      sumVirials_zx += particles.virialZX(i);
-      sumVirials_zy += particles.virialZY(i);
-      sumVirials_zz += particles.virialZZ(i);
+      sumVirials_zx += particles.virial_zx_[i];
+      sumVirials_zy += particles.virial_zy_[i];
+      sumVirials_zz += particles.virial_zz_[i];
     }
     double volume = sys.dimensions().volume();
 

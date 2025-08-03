@@ -84,7 +84,7 @@ public:
 
     double mass = settings.mass();
     for(int i=0;i<particles_.size();i++){
-      particles_.mass(i) = mass;
+      particles_.mass_[i] = mass;
     }
   }
   ~System() = default;
@@ -197,11 +197,11 @@ public:
     particles_.updateEnergy(vcm_x_,vcm_y_,vcm_z_);
     double e_pot = 0, e_kin = 0, e_term = 0, e_int = 0, e_full = 0;
     for(int i=0;i<size;i++){
-      e_pot += particles_.ePot(i);
-      e_kin += particles_.eKin(i);
-      e_term += particles_.eTerm(i);
-      e_int += particles_.eInt(i);
-      e_full += particles_.eFull(i);
+      e_pot += particles_.e_pot_[i];
+      e_kin += particles_.e_kin_[i];
+      e_term += particles_.e_term_[i];
+      e_int += particles_.e_int_[i];
+      e_full += particles_.e_full_[i];
     }
     // Средняя на 1 частицу
     e_pot_ = e_pot/size;
@@ -221,9 +221,9 @@ public:
     int size = particles_.size();
     double vel_x{0}, vel_y{0}, vel_z{0};
     for(int i=0;i<size;i++){
-      vel_x += particles_.velocityX(i);
-      vel_y += particles_.velocityY(i);
-      vel_z += particles_.velocityZ(i);
+      vel_x += particles_.velocity_x_[i];
+      vel_y += particles_.velocity_y_[i];
+      vel_z += particles_.velocity_z_[i];
     }
     vcm_x_ = vel_x / size;
     vcm_y_ = vel_y / size;
@@ -234,7 +234,7 @@ public:
     double pulse = 0.0;
     int size = particles_.size();
     for(int i=0;i<size;i++){
-      pulse += particles_.pulse(i);
+      pulse += particles_.pulse_[i];
     }
     pulse_ = pulse / size;
   }
@@ -274,7 +274,7 @@ public:
     oss.precision(16);
     oss << "Coordinates:\n" << std::endl;
     for(int i=0;i<particles_.size();i++) {
-      oss << i << ": "<< particles_.coordX(i) << "; " << particles_.coordY(i) << "; " << particles_.coordZ(i) << std::endl;
+      oss << i << ": "<< particles_.coord_x_[i] << "; " << particles_.coord_y_[i] << "; " << particles_.coord_z_[i] << std::endl;
     }
 
     return oss.str();
@@ -284,7 +284,7 @@ public:
     oss.precision(16);
     oss << "Velocity:\n" << std::endl;
     for(int i=0;i<particles_.size();i++) {
-      oss << i << ": "<< particles_.velocityX(i) << "; " << particles_.velocityY(i) << "; " << particles_.velocityZ(i) << std::endl;
+      oss << i << ": "<< particles_.velocity_x_[i] << "; " << particles_.velocity_y_[i] << "; " << particles_.velocity_z_[i] << std::endl;
     }
 
     return oss.str();
@@ -294,7 +294,7 @@ public:
     oss.precision(16);
     oss << "Force:\n" << std::endl;
     for(int i=0;i<particles_.size();i++) {
-      oss << i << ": "<< particles_.forceX(i) << "; " << particles_.forceY(i) << "; " << particles_.forceZ(i) << std::endl;
+      oss << i << ": "<< particles_.force_x_[i] << "; " << particles_.force_y_[i] << "; " << particles_.force_z_[i] << std::endl;
     }
 
     return oss.str();

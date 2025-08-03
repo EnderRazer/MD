@@ -53,6 +53,10 @@ public:
 
   // Pair potential energy of the particle
   alignas(64) std::vector<double, AlignedAllocator<double, 64>>  pair_potential_{};   
+
+  // OM of particles
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  ce_{};
+  alignas(64) std::vector<double, AlignedAllocator<double, 64>>  d_ce_{};
 public:
   // Default constructor: Initializes everything to zero.
   Particles() = default;
@@ -74,6 +78,8 @@ public:
 
     electron_density_.resize(N);
     pair_potential_.resize(N);
+    ce_.resize(N);
+    d_ce_.resize(N);
   };
 
   void resize(size_t n) {
@@ -90,8 +96,11 @@ public:
 
     e_kin_.resize(n), e_pot_.resize(n), e_int_.resize(n), e_term_.resize(n), e_full_.resize(n);
     pulse_.resize(n);
+
     electron_density_.resize(n);
     pair_potential_.resize(n);
+    ce_.resize(N);
+    d_ce_.resize(N);
   }
 
   inline void applyForceInteraction(const size_t index, const ForceCalcValues &result) {
@@ -180,8 +189,78 @@ public:
       vz[i] += fz[i]*mt;
     }
   }
+
+  // Вспомогательная функция Morton
+  inline uint64_t expandBits(uint32_t v) {
+      uint64_t x = v & 0x1fffff;
+      x = (x | x << 32) & 0x1f00000000ffff;
+      x = (x | x << 16) & 0x1f0000ff0000ff;
+      x = (x | x << 8)  & 0x100f00f00f00f00f;
+      x = (x | x << 4)  & 0x10c30c30c30c30c3;
+      x = (x | x << 2)  & 0x1249249249249249;
+      return x;
+  }
+  
+  inline uint64_t morton3D(uint32_t x, uint32_t y, uint32_t z) {
+      return expandBits(x) | (expandBits(y) << 1) | (expandBits(z) << 2);
+  }
+
+  void reorderByMorton() {
+    if (N == 0) return;
+
+    // 1. Генерируем ключи Morton
+    std::vector<uint64_t> keys(N);
+    std::vector<size_t> indices(N);
+    for (size_t i = 0; i < N; ++i) indices[i] = i;
+
+    // Находим границы для нормализации координат
+    double minX = *std::min_element(coord_x_.begin(), coord_x_.end());
+    double minY = *std::min_element(coord_y_.begin(), coord_y_.end());
+    double minZ = *std::min_element(coord_z_.begin(), coord_z_.end());
+    double maxX = *std::max_element(coord_x_.begin(), coord_x_.end());
+    double maxY = *std::max_element(coord_y_.begin(), coord_y_.end());
+    double maxZ = *std::max_element(coord_z_.begin(), coord_z_.end());
+
+    double scaleX = (maxX - minX > 1e-12) ? (1023.0 / (maxX - minX)) : 1.0;
+    double scaleY = (maxY - minY > 1e-12) ? (1023.0 / (maxY - minY)) : 1.0;
+    double scaleZ = (maxZ - minZ > 1e-12) ? (1023.0 / (maxZ - minZ)) : 1.0;
+
+    for (size_t i = 0; i < N; ++i) {
+        uint32_t xi = (uint32_t)((coord_x_[i] - minX) * scaleX);
+        uint32_t yi = (uint32_t)((coord_y_[i] - minY) * scaleY);
+        uint32_t zi = (uint32_t)((coord_z_[i] - minZ) * scaleZ);
+        keys[i] = morton3D(xi, yi, zi);
+    }
+
+    // 2. Сортируем индексы по ключам
+    std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b) {
+        return keys[a] < keys[b];
+    });
+
+    // 3. Перепаковываем все массивы
+    auto reorderVec = [&](auto &vec) {
+        using T = typename std::decay<decltype(vec)>::type::value_type;
+        std::vector<T, AlignedAllocator<T, 64>> tmp(N);
+        for (size_t i = 0; i < N; ++i) tmp[i] = vec[indices[i]];
+        vec.swap(tmp);
+    };
+
+    reorderVec(mass_);
+    reorderVec(coord_x_); reorderVec(coord_y_); reorderVec(coord_z_);
+    reorderVec(velocity_x_); reorderVec(velocity_y_); reorderVec(velocity_z_);
+    reorderVec(force_x_); reorderVec(force_y_); reorderVec(force_z_);
+    reorderVec(virial_xx_); reorderVec(virial_xy_); reorderVec(virial_xz_);
+    reorderVec(virial_yx_); reorderVec(virial_yy_); reorderVec(virial_yz_);
+    reorderVec(virial_zx_); reorderVec(virial_zy_); reorderVec(virial_zz_);
+    reorderVec(e_pot_); reorderVec(e_kin_); reorderVec(e_int_);
+    reorderVec(e_term_); reorderVec(e_full_);
+    reorderVec(pulse_);
+    reorderVec(electron_density_);
+    reorderVec(pair_potential_);
+  }
   //Геттеры
   constexpr size_t size() const { return N; }
+  /*
   //Масса
   inline double& mass(size_t i) { return mass_[i]; }
   inline const double& mass(size_t i) const { return mass_[i]; }
@@ -256,7 +335,7 @@ public:
   // Pair potential energy of the particle
   inline double& pairPart(size_t i) {return pair_potential_[i]; }
   inline const double& pairPart(size_t i) const {return pair_potential_[i]; }  
-
+  */
   // Запрещаем копирование
   Particles(const Particles &) = delete;
   Particles &operator=(const Particles &) = delete;

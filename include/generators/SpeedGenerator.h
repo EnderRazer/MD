@@ -5,7 +5,6 @@
 #include "core/Settings.h"
 #include "core/System.h"
 #include "random_normalized.h"
-#include <ostream>
 
 class SpeedGenerator {
 private:
@@ -20,13 +19,13 @@ public:
       speed_y = sigma_maxwell_ * gasdev(settings.seed());
       speed_z = sigma_maxwell_ * gasdev(settings.seed());
 
-      particles.velocityX(i)= speed_x;
-      particles.velocityY(i)= speed_y;
-      particles.velocityZ(i)= speed_z;
+      particles.velocity_x_[i]= speed_x;
+      particles.velocity_y_[i]= speed_y;
+      particles.velocity_z_[i]= speed_z;
 
-      particles.velocityX(i + pn / 2) = -speed_x;
-      particles.velocityY(i + pn / 2) = -speed_y;
-      particles.velocityZ(i + pn / 2) = -speed_z;
+      particles.velocity_x_[i + pn / 2] = -speed_x;
+      particles.velocity_y_[i + pn / 2] = -speed_y;
+      particles.velocity_z_[i + pn / 2] = -speed_z; 
     }
     //std::cout << sys.getParticlesVelocityInfo() << std::endl;
   }

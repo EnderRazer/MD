@@ -49,9 +49,7 @@ private:
   Macroparams macroparams_;
 
 public:
-  void CalculateCoordinates(System &sys_) {
-    Timer timer{1};
-    timer.start();
+  void CalculateCoordinates(System &sys_) {  
     Particles &particles = sys_.particles();
     Dimensions &dim = sys_.dimensions();
     double dt = settings_.dt();
@@ -62,7 +60,6 @@ public:
     const double ly = dim.sizeY();
     const double lz = dim.sizeZ();
 
-    #pragma omp simd
     for (size_t i = 0; i < particles.size(); ++i) {
       particles.coord_x_[i] += particles.velocity_x_[i] * dt;
       particles.coord_y_[i] += particles.velocity_y_[i] * dt;
@@ -72,80 +69,29 @@ public:
       particles.coord_y_[i] -= pbc * ly * std::floor(particles.coord_y_[i] / ly);
       particles.coord_z_[i] -= pbc * lz * std::floor(particles.coord_z_[i] / lz);
     }
-    //coords_.compute(particles);
-    /*
-    for(int i=0;i<pn;i++){
-      coords_.compute(particles, i);
-    }
-    */
-    /*
-    const int blockSize =
-        pn / settings_.threads(); // или любая удобная величина
-    std::vector<std::future<void>> futures;
-    for (int start = 0; start < pn; start += blockSize) {
-      int end = std::min(start + blockSize, pn);
-      // enqueue задачу на вычисление для блока [start, end)
-      futures.push_back(
-          threadPool_.enqueue([this, &particles, &dim, start, end]() {
-            for (int i = start; i < end; i++) {
-              coords_.compute(particles, i);
-            }
-          }));
-    }
-    // Ждём завершения всех
-    for (auto &f : futures) {
-      f.get();
-    }
-    */
-    timer.stop();
-    std::cout<<"Coord elapsed time: "<<timer.elapsed()<<" ms"<<std::endl;
   }
 
   void CalculateVelocities(System &sys_) {
-    Timer timer{1};
-    timer.start();
     Particles &particles = sys_.particles();
     double mt = settings_.dt() / (2 * settings_.mass());
-    int tn = settings_.threads();
-    //int pn = particles.size();
-    //vels_.compute(particles);
-    #pragma omp simd
+    
     for (size_t i = 0; i < particles.size(); ++i) {
       particles.velocity_x_[i] += particles.force_x_[i]*mt;
       particles.velocity_y_[i] += particles.force_y_[i]*mt;
       particles.velocity_z_[i] += particles.force_z_[i]*mt;
     }
-    
-    /*
-    const int blockSize =
-        pn / settings_.threads(); // или любая удобная величина
-    std::vector<std::future<void>> futures;
-
-    for (int start = 0; start < pn; start += blockSize) {
-      int end = std::min(start + blockSize, pn);
-      // enqueue задачу на вычисление для блока [start, end)
-      futures.push_back(threadPool_.enqueue([this, &particles, start, end]() {
-        std::cout << "Thread: " << start << " - " << end << std::endl;
-        for (int i = start; i < end; i++) {
-          vels_.compute(particles, i);
-        }
-      }));
-    }
-    // Ждём завершения всех
-    for (auto &f : futures) {
-      f.get();
-    }
-    */
-    timer.stop();
-    std::cout<<"Velocity elapsed time: "<<timer.elapsed()<<" ms"<<std::endl;
   }
   
   void CalculateEAM(System &sys_, EAM &pot_) {
     Dimensions &dim = sys_.dimensions();
     Particles &particles = sys_.particles();
+    
     const int pn = particles.size();
+    int tn = settings_.threads();
+    int pbc = settings_.hasPbc();
 
     double lx = dim.sizeX(), ly = dim.sizeY(), lz = dim.sizeZ();
+    double half_lx = dim.halfSizeX(), half_ly = dim.halfSizeY(), half_lz = dim.halfSizeZ();
     double inv_lx = 1/dim.sizeX(), inv_ly = 1/dim.sizeY(), inv_lz = 1/dim.sizeZ();
 
     double* __restrict__ x_ = particles.coord_x_.data();
@@ -170,115 +116,296 @@ public:
 
     double* __restrict__ ed_ = particles.electron_density_.data();
     double* __restrict__ pp_ = particles.pair_potential_.data();
+    double* __restrict__ ce_ = particles.ce_.data();
+    double* __restrict__ d_ce_ = particles.d_ce_.data();
 
     double* __restrict__ epot_ = particles.e_pot_.data();
 
-    // Создаем список ячеек
     Timer timer{1};
+
+    // Создаем список ячеек
     timer.start();
+    std::vector<std::vector<int>> neighbours;
     cell_list_.rebuild(pot_.getRcut(), dim.sizeX(), dim.sizeY(), dim.sizeZ());
     cell_list_.distribute_particles(particles);
+    cell_list_.buildAllNeighbors(neighbours, particles, pbc);
     int nmax = cell_list_.maxNeighborsCount();
     timer.stop();
     std::cout<<"Cell list build elapsed time: "<<timer.elapsed()<<" ms"<<std::endl;
+  
+    timer.start();
+    // Предрасчеты для потенциала EAM
+    #pragma omp parallel num_threads(tn)
+    {
+      int ni, ns;
+
+      double dx,dy,dz;
+      double r2,r;
+
+      double r_over_Re, t1, t2, t3, exp1, exp2, pow1, pow2;
+      double mu,rho_f;
+      
+      #pragma omp for schedule(dynamic)
+      for (int i = 0; i < pn; i++) {
+        mu = 0.0, rho_f = 0.0;
+
+        const auto& neighbours_i = neighbours[i];
+        ns = static_cast<int>(neighbours_i.size());
+          
+        #pragma omp simd aligned(x_,y_,z_:64) reduction(+:mu, rho_f)
+        for (int j = 0;j < ns;j++) {
+          ni = neighbours_i[j];
+
+          //Векторное расстояние
+          dx = x_[i] - x_[ni];
+          dy = y_[i] - y_[ni];
+          dz = z_[i] - z_[ni];
+
+          // Отражение частицы
+          dx -= pbc * (dx > half_lx) * lx;
+          dx += pbc * (dx < -half_lx) * lx;
+
+          dy -= pbc * (dy > half_ly) * ly;
+          dy += pbc * (dy < -half_ly) * ly;
+
+          dz -= pbc * (dz > half_lz) * lz;
+          dz += pbc * (dz < -half_lz) * lz;
+
+          //Расстояние между частицами
+          r2 = dx*dx + dy*dy + dz*dz;
+          r  = sqrt(r2);
+
+          //Расчеты ЕАМ
+          r_over_Re = r * pot_.inv_r_e_;
+          t1 = r_over_Re - 1;
+          t2 = r_over_Re - pot_.k_;
+          t3 = r_over_Re - pot_.lambda_;
+
+          exp1 = exp(-pot_.alpha_ * t1);
+          exp2 = exp(-pot_.beta_ * t1);
+
+          pow1 = pot_.my_pow_n(t2, pot_.m_);
+          pow2 = pot_.my_pow_n(t3, pot_.n_);
+            
+          rho_f += (pot_.f_e_ * exp2) / (1 + pow2);
+          mu += (pot_.a_ * exp1 / (1 + pow1)) - (pot_.b_ * exp2 / (1 + pow2));
+        }
+
+        ed_[i] = rho_f;
+        pp_[i] = mu;
+      }
+    }
+    timer.stop();
+    std::cout<<"Precalc EAM time elapsed = " << timer.elapsed() << " ms" << std::endl;
     
+    timer.start();
+    #pragma omp parallel num_threads(tn)
+    {
+      double om_val, dom_val;
 
-    int tn = settings_.threads();
-    int pbc = settings_.hasPbc();
+      double rho_over_RHO_n, rho_pow1, rho_pow2, rho_pow3;
+      double rho_over_RHO_s, pow_term, log_term, pow_term_eta_minus1;
+      double rho_over_RHO_e;
+      #pragma omp for schedule(dynamic)
+        for(int i = 0; i < pn; i++){
+        om_val = 0.0;
+        dom_val = 0.0;
 
-      timer.start();
-      // Предрасчеты для потенциала EAM
-      #pragma omp parallel num_threads(tn)
-      {
-        std::vector<int> neighbors;
-        neighbors.resize(nmax);
+        if (ed_[i] < pot_.rho_n_) {
+          // ---- om1 и d_om1 ----
+          rho_over_RHO_n = ed_[i] / pot_.rho_n_ - 1.0;
 
-        #pragma omp for schedule(dynamic)
-        for (int i = 0; i < pn; i++) {
-          double mu = 0.0, rho_f = 0.0;
-          int ns = cell_list_.getNeighbors(neighbors, particles, i, pbc);
-          if(ns > nmax){
-          std::cout << "Max n_count = "<<nmax<<std::endl;
-          std::cout << "Current n_count = "<<ns<<std::endl;
-          }
-          // Векторизация по соседям
-          #pragma omp simd reduction(+:mu, rho_f)
-          for (int j = 0;j < ns;j++) {
-            int ni = neighbors[j];
-            //Векторное расстояние
-            double dx = x_[i] - x_[ni];
-            double dy = y_[i] - y_[ni];
-            double dz = z_[i] - z_[ni];
-            // Отражение частицы
-            dx -= pbc * lx * nearbyint(dx * inv_lx);
-            dy -= pbc * ly * nearbyint(dy * inv_ly);
-            dz -= pbc * lz * nearbyint(dz * inv_lz);
-            //Расстояние между частицами
-            double r2 = dx*dx + dy*dy + dz*dz;
-            double r  = sqrt(r2);
-            //Расчеты ЕАМ
-            double pp = pot_.mu(r);
-            double dp = pot_.rho_f(r);
-          }
-          ed_[i] = rho_f;
-          pp_[i] = mu;
+          // Horner для многочлена 3-й степени
+          rho_pow1 = rho_over_RHO_n;
+          rho_pow2 = rho_pow1 * rho_over_RHO_n;
+          rho_pow3 = rho_pow2 * rho_over_RHO_n;
+
+          // om1
+          om_val = pot_.om_n_[0]
+                 + pot_.om_n_[1] * rho_pow1
+                 + pot_.om_n_[2] * rho_pow2
+                 + pot_.om_n_[3] * rho_pow3;
+
+          // d_om1
+          dom_val = (1.0 * pot_.om_n_[1] * 1.0
+                   + 2.0 * pot_.om_n_[2] * rho_pow1
+                   + 3.0 * pot_.om_n_[3] * rho_pow2) / pot_.rho_n_;
+
+        } else if (ed_[i] >= pot_.rho_0_) {
+          // ---- om3 и d_om3 ----
+          rho_over_RHO_s = ed_[i] / pot_.rho_s_;
+
+          // pow и log
+          pow_term = pot_.my_pow_n(rho_over_RHO_s, pot_.eta_);
+          log_term = std::log(pow_term); // = eta_ * log(rho/rho_s)
+
+          // om3
+          om_val = pot_.om_e_ * (1.0 - log_term) * pow_term;
+
+          // d_om3
+          // my_pow_n(x, eta_-1) = pow_term / x
+          pow_term_eta_minus1 = pow_term / rho_over_RHO_s;
+          dom_val = -pot_.om_e_ * pot_.eta_ * pow_term_eta_minus1 * log_term / pot_.rho_s_;
+
+        } else {
+          // ---- om2 и d_om2 ----
+          rho_over_RHO_e = ed_[i] / pot_.rho_e_ - 1.0;
+
+          rho_pow1 = rho_over_RHO_e;
+          rho_pow2 = rho_pow1 * rho_over_RHO_e;
+          rho_pow3 = rho_pow2 * rho_over_RHO_e;
+
+          // om2
+          om_val = pot_.om_[0]
+                 + pot_.om_[1] * rho_pow1
+                 + pot_.om_[2] * rho_pow2
+                 + pot_.om_[3] * rho_pow3;
+
+          // d_om2
+          dom_val = (1.0 * pot_.om_[1] * 1.0
+                   + 2.0 * pot_.om_[2] * rho_pow1
+                   + 3.0 * pot_.om_[3] * rho_pow2) / pot_.rho_e_;
         }
+
+        epot_[i] = pot_.energy_unit_ * (om_val + 0.5 * pp_[i]);
+        ce_[i] = om_val;
+        d_ce_[i] = dom_val;
       }
-      timer.stop();
-      std::cout<<"Precalc EAM time elapsed " << timer.elapsed() << " ms" << std::endl;
-      // Основной блок расчетов
-      timer.start();
-      #pragma omp parallel num_threads(tn)
-      {
-        std::vector<int> neighbors;
-        neighbors.resize(nmax);
+    }
+    timer.stop();
+    std::cout<<"Middle EAM time elapsed = " << timer.elapsed() << " ms" << std::endl;
 
-        #pragma omp for schedule(dynamic)
-        for (int i = 0; i < pn; i++) {
-          //Обнуление сил и вириалов
-          double fx = 0.0,fy = 0.0, fz = 0.0;
-          double vxx = 0.0, vxy = 0.0, vxz = 0.0;
-          double vyx = 0.0, vyy = 0.0, vyz = 0.0;
-          double vzx = 0.0, vzy = 0.0, vzz = 0.0;
+    // Основной блок расчетов
+    timer.start();
+    #pragma omp parallel num_threads(tn)
+    {
+      int ns, ni;
 
-          int ns = cell_list_.getNeighbors(neighbors, particles,i, pbc);
-          //#pragma omp simd reduction(+:fx, fy, fz, vxx, vxy, vxz, vyx, vyy, vyz, vzx, vzy, vzz)
-          for (int j = 0; j < ns;j++) {
-            //Сосед
-            int ni = neighbors[j];
-            //Векторное расстояние
-            double dx = x_[i] - x_[ni];
-            double dy = y_[i] - y_[ni];
-            double dz = z_[i] - z_[ni];
-            // Отражение частицы
-            dx -= pbc * lx * (long long)(dx * inv_lx + (dx >= 0 ? 0.5 : -0.5));
-            dy -= pbc * ly * (long long)(dy * inv_ly + (dy >= 0 ? 0.5 : -0.5));
-            dz -= pbc * lz * (long long)(dz * inv_lz + (dz >= 0 ? 0.5 : -0.5));
-            //Расстояние между частицами
-            double r2 = dx*dx + dy*dy + dz*dz;
-            double r  = sqrt(r2);
-            //Сила потенциала
-            double FU = pot_.getFU(ed_[i], ed_[ni], r);    
+      double ix,iy,iz,idom;
+      double dx,dy,dz;
+      double r2,r, inv_r;
 
-            double Fx = dx * FU / r;
-            double Fy = dy * FU / r;
-            double Fz = dz * FU / r;
+      double fx, fy, fz;
+      double vxx, vxy, vxz;
+      double vyx, vyy, vyz;
+      double vzx, vzy, vzz;
 
-            fx += Fx; fy += Fy; fz += Fz;
-            vxx += dx*Fx; vxy += dx*Fy; vxz += dx*Fz;
-            vyx += dy*Fx; vyy += dy*Fy; vyz += dy*Fz;
-            vzx += dz*Fx; vzy += dz*Fy; vzz += dz*Fz;
-          }
-          epot_[i] = pot_.getU(ed_[i], pp_[i]);
-          fx_[i] = fx; fy_[i] = fy; fz_[i] = fz;
-          vxx_[i] = vxx; vxy_[i] = vxy; vxz_[i] = vxz;
-          vyx_[i] = vyx; vyy_[i] = vyy; vyz_[i] = vyz;
-          vzx_[i] = vzx; vzy_[i] = vzy; vzz_[i] = vzz;
+      double FU, Fx, Fy, Fz;
 
+      double r_over_Re, t1, t2, t3;
+      double exp1, exp2, pow1, pow1m1, pow2, pow2m1;
+      double plus_pow1,inv_plus_pow1, inv_plus_pow1_sqr, plus_pow2, inv_plus_pow2, inv_plus_pow2_sqr;
+      double var11, var12, var1, var21, var22, var2;
+      double var1_rho, var2_rho;
+      double d_mu, d_rho_f;
+
+      //std::vector<double, AlignedAllocator<double,64>> nx(nmax);
+      //std::vector<double, AlignedAllocator<double,64>> ny(nmax);
+      //std::vector<double, AlignedAllocator<double,64>> nz(nmax);
+      //std::vector<double, AlignedAllocator<double,64>> ndom(nmax);
+
+      #pragma omp for schedule(dynamic)
+      for (int i = 0; i < pn; i++) {
+        //Обнуление сил и вириалов
+        fx = 0.0,fy = 0.0, fz = 0.0;
+        vxx = 0.0, vxy = 0.0, vxz = 0.0;
+        vyx = 0.0, vyy = 0.0, vyz = 0.0;
+        vzx = 0.0, vzy = 0.0, vzz = 0.0;
+        
+        ix = x_[i], iy = y_[i], iz = z_[i], idom = d_ce_[i];
+        
+        const auto& neighbours_i = neighbours[i];
+        ns = neighbours_i.size();
+
+        //for (int j = 0; j < ns; j++) {
+        //  int ni = neighbours_i[j];
+        //  nx[j] = x_[ni];
+        //  ny[j] = y_[ni];
+        //  nz[j] = z_[ni];
+        //  ndom[j] = d_ce_[ni];
+        //}
+        
+        #pragma omp simd reduction(+:fx, fy, fz, vxx, vxy, vxz, vyx, vyy, vyz, vzx, vzy, vzz)
+        for (int j = 0; j < ns;j++) {
+          ni = neighbours_i[j];
+          //Векторное расстояние
+          dx = ix - x_[ni];
+          dy = iy - y_[ni];
+          dz = iz - z_[ni];
+          // Отражение частицы
+          dx -= pbc * (dx > half_lx) * lx;
+          dx += pbc * (dx < -half_lx) * lx;
+
+          dy -= pbc * (dy > half_ly) * ly;
+          dy += pbc * (dy < -half_ly) * ly;
+
+          dz -= pbc * (dz > half_lz) * lz;
+          dz += pbc * (dz < -half_lz) * lz;
+
+          //Расстояние между частицами
+          r2 = dx*dx + dy*dy + dz*dz;
+          r  = sqrt(r2);
+          inv_r = 1/r;
+          //Сила потенциала
+
+          r_over_Re = r * pot_.inv_r_e_;
+          t1 = r_over_Re - 1.0;
+          t2 = r_over_Re - pot_.k_;
+          t3 = r_over_Re - pot_.lambda_;
+
+          // Общие экспоненты
+          exp1 = exp(-pot_.alpha_ * t1);
+          exp2 = exp(-pot_.beta_  * t1);
+
+          // Общие степени
+          pow1 = pot_.my_pow_n(t2, pot_.m_);       // (r/Re - k)^m
+          plus_pow1 = (1.0 + pow1);
+          inv_plus_pow1 = 1.0 / plus_pow1;
+          inv_plus_pow1_sqr = inv_plus_pow1 * inv_plus_pow1;
+          pow1m1 = pot_.my_pow_n(t2, pot_.m_ - 1);  // (r/Re - k)^(m-1)
+          pow2 = pot_.my_pow_n(t3, pot_.n_);       // (r/Re - λ)^n
+          plus_pow2 = (1.0 + pow2);
+          inv_plus_pow2 = 1.0 / plus_pow2;
+          inv_plus_pow2_sqr = inv_plus_pow2 * inv_plus_pow2;
+          pow2m1 = pot_.my_pow_n(t3, pot_.n_ - 1);  // (r/Re - λ)^(n-1)
+
+
+          // ------------------- d_mu -------------------
+          var11 = (-pot_.a_ * pot_.alpha_ * pot_.inv_r_e_) * exp1 * plus_pow1;
+          var12 = (pot_.m_ * pot_.inv_r_e_) * pow1m1 * pot_.a_ * exp1;
+          var1 = (var11 - var12) * inv_plus_pow1_sqr;
+
+          var21 = (pot_.n_ * pot_.inv_r_e_) * pow2m1 * pot_.b_ * exp2;
+          var22 = (-pot_.b_ * pot_.beta_ * pot_.inv_r_e_) * exp2 * plus_pow2;
+          var2 = (var21 - var22) * inv_plus_pow2_sqr;
+
+          // ------------------- d_rho_f -------------------
+          var1_rho = (-pot_.beta_ * pot_.inv_r_e_) * exp2 * plus_pow2;
+          var2_rho = (pot_.n_ * pot_.inv_r_e_) * pow2m1 * exp2;
+          //var3_rho = 1.0 + pow2;
+
+          d_mu = var1 + var2;
+          d_rho_f = pot_.f_e_ * (var1_rho - var2_rho) * inv_plus_pow2_sqr;
+
+          FU = -pot_.energy_unit_ * (((idom + d_ce_[ni]) * d_rho_f) + d_mu);
+
+          Fx = dx * FU * inv_r;
+          Fy = dy * FU * inv_r;
+          Fz = dz * FU * inv_r;
+
+          fx += Fx; fy += Fy; fz += Fz;
+          vxx += dx*Fx; vxy += dx*Fy; vxz += dx*Fz;
+          vyx += dy*Fx; vyy += dy*Fy; vyz += dy*Fz;
+          vzx += dz*Fx; vzy += dz*Fy; vzz += dz*Fz;
         }
+        fx_[i] = fx; fy_[i] = fy; fz_[i] = fz;
+        vxx_[i] = vxx; vxy_[i] = vxy; vxz_[i] = vxz;
+        vyx_[i] = vyx; vyy_[i] = vyy; vyz_[i] = vyz;
+        vzx_[i] = vzx; vzy_[i] = vzy; vzz_[i] = vzz;
       }
-      timer.stop();
-      std::cout<<"Main EAM time elapsed " << timer.elapsed() << " ms" << std::endl;
+    }
+    timer.stop();
+    std::cout<<"Main EAM time elapsed " << timer.elapsed() << " ms" << std::endl;
     
     // Основной блок расчетов
     /*
@@ -350,6 +477,7 @@ public:
   void initialStep(System &sys_) {
     backupManager_.createBackup(sys_);
     // Расчет сил
+    timer_.start();
     switch (potential_->getPotentialType()) {
     case Potential::PotentialType::EAM:
       CalculateEAM(sys_, *static_cast<EAM*>(potential_.get()));
@@ -361,48 +489,75 @@ public:
       throw std::invalid_argument("Unknown potential");
       break;
     }
+    timer_.stop();
+    std::cout<<"CalculateForce elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     //CalculateForces(sys_);
     // Обновление центра масс
+    timer_.start();
     sys_.updateVCM();
+    timer_.stop();
+    std::cout<<"updateVCM elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     // Обновление энергий
+    timer_.start();
     sys_.updateEnergy();
+    timer_.stop();
+    std::cout<<"updateEnergy elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     // Обновление импульса
+    timer_.start();
     sys_.updatePulse();
+    timer_.stop();
+    std::cout<<"updatePulse elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     // Расчет макропараметров (Температура, давление)
+    timer_.start();
     sys_.setTemperature(macroparams_.getTemperature(sys_));
     sys_.setPressure(macroparams_.getPressure(sys_));
-
     if (ensemble_manager_ && ensemble_manager_->enabled()) {
       std::cout << "Расчет транспортных коэффициентов" << std::endl;
       ensemble_manager_->accumulateGreenCubo(sys_);
     }
+    timer_.stop();
+    std::cout<<"calculateMacroparams elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     // Вывод в файл
     outputManager_.writeSystemProperties(sys_);
     outputManager_.writeStepData(sys_);
   }
+  
   bool advanceStep(System &sys_) {
     sys_.advanceStep();
     // Термостат Ланжевена
     if (thermostat_ && thermostat_->getThermostatType() ==
                            Thermostat::ThermostatType::LANGEVIN) {
-      //std::cout << "Applying Langevin thermostat" << std::endl;
+      timer_.start();
+      std::cout << "Applying Langevin thermostat" << std::endl;
       thermostat_->applyTemperatureControl(sys_);
+      timer_.stop();
+      std::cout<<"applyTemperatureControl elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     }
-
+    
+    timer_.start();
     // Расчет первой половины скоростей
     CalculateVelocities(sys_);
+    timer_.stop();
+    std::cout<<"CalculateVelocities elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
+    timer_.start();
     // Расчет новых координат
     CalculateCoordinates(sys_);
+    timer_.stop();
+    std::cout<<"CalculateCoordinates elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
     // Баростат Берендсена
     if (barostat_ &&
         barostat_->getBarostatType() == Barostat::BarostatType::BERENDSEN) {
-      //std::cout << "Applying Berendsen barostat" << std::endl;
+      timer_.start();
+      std::cout << "Applying Berendsen barostat" << std::endl;
       barostat_->applyPressureControl(sys_);
+      timer_.stop();
+      std::cout<<"applyPressureControl elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     }
 
     // Расчет сил
+    timer_.start();
     switch (potential_->getPotentialType()) {
     case Potential::PotentialType::EAM:
       CalculateEAM(sys_, *static_cast<EAM*>(potential_.get()));
@@ -414,41 +569,53 @@ public:
       throw std::invalid_argument("Unknown potential");
       break;
     }
-    // Расчет сил
-    //CalculateForces(sys_);
+    timer_.stop();
+    std::cout<<"CalculateForces elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
     // Расчет второй половины скоростей
+    timer_.start();
     CalculateVelocities(sys_);
+    timer_.stop();
+    std::cout<<"CalculateVelocities elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
     // Термостат Берендсена
     if (thermostat_ && thermostat_->getThermostatType() ==
                            Thermostat::ThermostatType::BERENDSEN) {
+      timer_.start();                    
       std::cout << "Applying Berendsen thermostat" << std::endl;
       thermostat_->applyTemperatureControl(sys_);
+      timer_.stop();
+      std::cout<<"applyTemperatureControl elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     }
     // Делаем бекап после расчета основных параметров
     if (sys_.currentStep() % backupManager_.frequency() == 0) {
       backupManager_.createBackup(sys_);
     }
     // Обновление центра масс
+    timer_.start();
     sys_.updateVCM();
+    timer_.stop();
+    std::cout<<"updateVCM elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     // Обновление энергий
+    timer_.start();
     sys_.updateEnergy();
+    timer_.stop();
+    std::cout<<"updateEnergy elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     // Обновление импульса
+    timer_.start();
     sys_.updatePulse();
+    timer_.stop();
+    std::cout<<"updatePulse elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
     // Расчет макропараметров (Температура, давление)
+    timer_.start();
     sys_.setTemperature(macroparams_.getTemperature(sys_));
     sys_.setPressure(macroparams_.getPressure(sys_));
-    // Транспортные коэффициенты
-    if (macroparams_.enabled()) {
-      if (ensemble_manager_ && ensemble_manager_->enabled() &&
-          !ensemble_manager_->completed()) {
-        ensemble_manager_->accumulateGreenCubo(sys_);
-      }
-      if (ensemble_manager_->completed()) {
-        return true;
-      }
+    if (ensemble_manager_ && ensemble_manager_->enabled()) {
+      std::cout << "Расчет транспортных коэффициентов" << std::endl;
+      ensemble_manager_->accumulateGreenCubo(sys_);
     }
+    timer_.stop();
+    std::cout<<"calculateMacroparams elapsed time: "<<timer_.elapsed()<<" ms"<<std::endl;
 
     if (sys_.currentStep() % outputManager_.frequency() == 0) {
       // Вывод в файл

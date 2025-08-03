@@ -45,9 +45,9 @@ public:
         sqrt(1 + dt_over_tau * ((pref_temperature / sys.temperature()) - 1));
     Particles &particles = sys.particles();
     for (int i = 0; i < particles.size(); i++) {
-      particles.velocityX(i) *= lambda;
-      particles.velocityY(i) *= lambda;
-      particles.velocityZ(i) *= lambda;
+      particles.velocity_x_[i] *= lambda;
+      particles.velocity_y_[i] *= lambda;
+      particles.velocity_z_[i] *= lambda;
     }
   }
   std::string getData() const override {
