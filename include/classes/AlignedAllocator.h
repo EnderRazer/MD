@@ -1,6 +1,13 @@
 #include <cstddef>
-#include <malloc/_malloc.h>
 #include <new>
+
+#if defined(__APPLE__) && defined(__MACH__)
+// macOS / iOS
+#include <malloc/_malloc.h>
+#elif defined(__linux__)
+// Linux
+#include <malloc.h>
+#endif
 
 template <typename T, size_t Alignment> struct AlignedAllocator {
   using value_type = T;
