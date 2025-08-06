@@ -27,13 +27,13 @@ private:
   bool toggle_{false};
   double tau_t_{0.0};
   double pref_temperature_{0.0};
-  double Vs_x_{0.0},Vs_y_{0.0},Vs_z_{0.0}; // Скорость потока
+  double Vs_x_{0.0}, Vs_y_{0.0}, Vs_z_{0.0}; // Скорость потока
 
   double sigma_lang_{0.0}; // Константа для термостата Ланжевена
 
-  double eps_{0.0};                   // Случайная величина (0;1)
-  std::vector<double> Fr_x_{},Fr_y_{},Fr_z_{}; // Случайная сила
-  std::vector<double> Ft_x_{},Ft_y_{},Ft_z_{}; // Сила трения
+  double eps_{0.0};                              // Случайная величина (0;1)
+  std::vector<double> Fr_x_{}, Fr_y_{}, Fr_z_{}; // Случайная сила
+  std::vector<double> Ft_x_{}, Ft_y_{}, Ft_z_{}; // Сила трения
 
 public:
   ~ThermostatLangevine() noexcept override = default;
@@ -41,14 +41,17 @@ public:
     toggle_ = config.value("toggle", false);
     pref_temperature_ = config.value("pref_temp", 0.0);
     tau_t_ = config.value("tau", 0.0);
-    std::vector<double> Vs = config["stream_velocity"].get<std::vector<double>>();
-    Vs_x_ = Vs[0], Vs_y_ = Vs[1], Vs_z_=Vs[2];
+    std::vector<double> Vs =
+        config["stream_velocity"].get<std::vector<double>>();
+    Vs_x_ = Vs[0], Vs_y_ = Vs[1], Vs_z_ = Vs[2];
     sigma_lang_ = sqrt((2 * settings.constants().KBOLTZMAN * pref_temperature_ *
                         settings.mass()) /
                        (tau_t_ * settings.dt()));
     seed_ = settings.seed();
-    Fr_x_.resize(particle_number), Fr_y_.resize(particle_number), Fr_z_.resize(particle_number);
-    Ft_x_.resize(particle_number), Ft_y_.resize(particle_number), Ft_z_.resize(particle_number);
+    Fr_x_.resize(particle_number), Fr_y_.resize(particle_number),
+        Fr_z_.resize(particle_number);
+    Ft_x_.resize(particle_number), Ft_y_.resize(particle_number),
+        Ft_z_.resize(particle_number);
   }
 
   // Запрещаем копирование
@@ -101,7 +104,8 @@ public:
     oss << "Using Langevin thermostat!";
     oss << "\n\tToggled: " << toggle_;
     oss << "\n\tPrefered temperature: " << pref_temperature_;
-    oss << "\n\tTau_t: " << tau_t_ << "\n\tStream velocity: (" << Vs_x_ << ", " << Vs_y_ << ", " << Vs_z_ << ")";
+    oss << "\n\tTau_t: " << tau_t_ << "\n\tStream velocity: (" << Vs_x_ << ", "
+        << Vs_y_ << ", " << Vs_z_ << ")";
     oss << "\n\tSIGMA_LANG: " << sigma_lang_ << "\n";
     return oss.str();
   }

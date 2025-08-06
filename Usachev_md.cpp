@@ -1,17 +1,17 @@
 #include <fstream>
 #include <iostream>
-//#include <omp.h>
+// #include <omp.h>
 
 using namespace std;
 
 #include <nlohmann/json.hpp>
 //  Классы
-#include "backups/BackupManager.h"   //Бекапы
-#include "barostats/Berendsen.h"     //Баростат
+#include "backups/BackupManager.h" //Бекапы
+#include "barostats/Berendsen.h"   //Баростат
+#include "classes/CellList.h"
 #include "classes/EnsembleManager.h" //Менеджер ансамблей
 #include "classes/ThreadPool.h"      //Пул тредов
 #include "classes/Timer.h"           //Таймер
-#include "classes/CellList.h"
 #include "core/MDAlgorithms.h"       //Алгоритмы МД
 #include "core/Settings.h"           //Класс настроек
 #include "core/System.h"             //Класс системы
@@ -127,8 +127,8 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<Thermostat> thermostat{nullptr};
     if (config.contains("thermostat") &&
         config["thermostat"].value("toggle", false)) {
-      thermostat =
-          createThermostat(config["thermostat"], settings, sys.particleNumber());
+      thermostat = createThermostat(config["thermostat"], settings,
+                                    sys.particleNumber());
     }
     if (thermostat)
       cout << thermostat->getData() << endl;
@@ -161,10 +161,10 @@ int main(int argc, char *argv[]) {
     CellList cellList;
     // Заводим переменную MDAlgorimths, которая содержит все методы МД
     json macroparams_config = config["macroparams"];
-    MDAlgorithms md = MDAlgorithms(settings, sys, backupManager, outputManager,
-                                   threadPool,cellList, std::move(ensembleManager),
-                                   std::move(thermostat), std::move(barostat), 
-                                   std::move(potential), macroparams_config);
+    MDAlgorithms md = MDAlgorithms(
+        settings, sys, backupManager, outputManager, threadPool, cellList,
+        std::move(ensembleManager), std::move(thermostat), std::move(barostat),
+        std::move(potential), macroparams_config);
 
     // Записываем конфигурацию запуска
     outputManager.writeModellingProperties(config);

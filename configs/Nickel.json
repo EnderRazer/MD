@@ -1,7 +1,7 @@
 {
   "backup": {
-    "frequency": 1,
-    "restore_step": 1000,
+    "frequency": 100,
+    "restore_step": 0,
     "toggle": false
   },
   "barostat": {
@@ -11,7 +11,7 @@
     "type": "BRNDSN"
   },
   "dimensions": {
-    "crist_length": 0.35314,
+    "crist_length": 0.351913728,
     "crist_num": [48, 48, 48],
     "void_num": [12, 12, 12]
   },
@@ -53,7 +53,7 @@
   "settings": {
     "debug": true,
     "delta_t": 0.002,
-    "nsteps": 10,
+    "nsteps": 0,
     "pbc": false,
     "profiling": false,
     "start_temp": 2.7315,
@@ -86,6 +86,6 @@
     "main_directory": "data",
     "steps_directory": "steps",
     "ensembles_directory": "ensemble",
-    "frequency": 1
+    "frequency": 100
   }
 }

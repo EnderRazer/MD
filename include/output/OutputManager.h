@@ -153,16 +153,15 @@ public:
                                         "KineticE",  "PotentialE",  "ThermalE",
                                         "InternalE", "TotalE",      "Pulse"};
 
-    std::vector<double> data = {
-        static_cast<double>(sys.currentStep()),
-        sys.temperature(),
-        sys.pressure(),
-        sys.eKin(),
-        sys.ePot(),
-        sys.eTerm(),
-        sys.eInt(),
-        sys.eFull(),
-        sys.pulse()};
+    std::vector<double> data = {static_cast<double>(sys.currentStep()),
+                                sys.temperature(),
+                                sys.pressure(),
+                                sys.eKin(),
+                                sys.ePot(),
+                                sys.eTerm(),
+                                sys.eInt(),
+                                sys.eFull(),
+                                sys.pulse()};
 
     writeRowToFile(filename, headers, data, true);
   }
@@ -174,16 +173,15 @@ public:
                                         "KineticE",  "PotentialE",  "ThermalE",
                                         "InternalE", "TotalE",      "Pulse"};
 
-    std::vector<double> data = {
-        static_cast<double>(sys.currentStep()),
-        sys.temperatureAvg(),
-        sys.pressureAvg(),
-        sys.eKinAvg(),
-        sys.ePotAvg(),
-        sys.eTermAvg(),
-        sys.eIntAvg(),
-        sys.eFullAvg(),
-        sys.pulseAvg()};
+    std::vector<double> data = {static_cast<double>(sys.currentStep()),
+                                sys.temperatureAvg(),
+                                sys.pressureAvg(),
+                                sys.eKinAvg(),
+                                sys.ePotAvg(),
+                                sys.eTermAvg(),
+                                sys.eIntAvg(),
+                                sys.eFullAvg(),
+                                sys.pulseAvg()};
 
     writeRowToFile(filename, headers, data, true);
   }
@@ -200,24 +198,16 @@ public:
     std::vector<std::vector<double>> data;
     int id = 0;
     Particles &particles = sys.particles();
-    for (int i = 0; i< particles.size(); i++) {
+    for (int i = 0; i < particles.size(); i++) {
       std::vector<double> row = {
-          static_cast<double>(i),
-          particles.coord_x_[i],
-          particles.coord_y_[i],
-          particles.coord_z_[i],
-          particles.velocity_x_[i],
-          particles.velocity_y_[i],
-          particles.velocity_z_[i],
-          particles.force_x_[i],
-          particles.force_y_[i],
-          particles.force_z_[i],
-          particles.e_pot_[i],
-          particles.e_kin_[i],
-          particles.e_term_[i],
-          particles.e_int_[i],
-          particles.e_full_[i]
-      };
+          static_cast<double>(i),   particles.coord_x_[i],
+          particles.coord_y_[i],    particles.coord_z_[i],
+          particles.velocity_x_[i], particles.velocity_y_[i],
+          particles.velocity_z_[i], particles.force_x_[i],
+          particles.force_y_[i],    particles.force_z_[i],
+          particles.e_pot_[i],      particles.e_kin_[i],
+          particles.e_term_[i],     particles.e_int_[i],
+          particles.e_full_[i]};
       data.push_back(row);
     }
 
