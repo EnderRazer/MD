@@ -1,6 +1,9 @@
 #include <fstream>
 #include <iostream>
-// #include <omp.h>
+
+#if defined(__linux__)
+#include <omp.h>
+#endif
 
 using namespace std;
 

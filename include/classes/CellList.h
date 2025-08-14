@@ -1,6 +1,7 @@
 #ifndef CELL_LIST_H
 #define CELL_LIST_H
 
+#include <_abort.h>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -72,13 +73,13 @@ public:
     }
   }
 
-  inline int maxNeighborsCount() {
+  inline int maxParticlesInCell() {
     return *std::max_element(cell_counts_.begin(), cell_counts_.end());
   }
-  inline int minNeighborsCount() {
+  inline int minParticlesInCell() {
     return *std::min_element(cell_counts_.begin(), cell_counts_.end());
   }
-  inline int avgNeighborsCount() {
+  inline int avgParticlesInCell() {
     double avg = 0;
     for (int i = 0; i < cell_counts_.size(); i++) {
       avg += cell_counts_[i];
@@ -88,6 +89,7 @@ public:
 
   int getNeighbors(std::vector<int> &neighbors, Particles &particles,
                    const int index, bool pbc) const {
+    neighbors.clear();
     int count = 0;
     double xi = particles.coord_x_[index];
     double yi = particles.coord_y_[index];
@@ -140,340 +142,77 @@ public:
 
         double r2 = dx * dx + dy * dy + dz * dz;
         if (r2 < cutoff_sqr_) {
-          if (r2 > cutoff_sqr_ * 2) {
-            printf("Suspicious neighbor i=%d j=%d r2=%.3f cutoff^2=%.3f\n",
-                   index, j, r2, cutoff_sqr_);
-          }
-          neighbors[count] = j;
+          neighbors.push_back(j);
           count++;
         }
       }
     }
 
     return count;
-    /*
-    double rVec_x,rVec_y,rVec_z;
-    if(pbc)
-    for (int dx = -1; dx <= 1; ++dx) {
-      for (int dy = -1; dy <= 1; ++dy) {
-        for (int dz = -1; dz <= 1; ++dz) {
-          nx = (cx + dx + num_cells_x_) % num_cells_x_;
-          ny = (cy + dy + num_cells_y_) % num_cells_y_;
-          nz = (cz + dz + num_cells_z_) % num_cells_z_;
-          nId = nx + ny * num_cells_x_ + nz * num_cells_xy_;
-
-          // NEW with distance check aka Verlet List
-          start = cell_offsets_[nId], end = cell_offsets_[nId + 1];
-
-          //#pragma omp parallel for
-          for (size_t k = start; k < end; ++k) {
-            j = flat_cells_[k];
-
-            rVec_x = xn[j] - xi;
-            rVec_y = yn[j] - yi;
-            rVec_z = zn[j] - zi;
-            // Отражение частицы
-            rVec_x -= (rVec_x > half_box_size_x_) * box_size_x_;
-            rVec_x += (rVec_x < -half_box_size_x_) * box_size_x_;
-
-            rVec_y -= (rVec_y > half_box_size_y_) * box_size_y_;
-            rVec_y += (rVec_y < -half_box_size_y_) * box_size_y_;
-
-            rVec_z -= (rVec_z > half_box_size_z_) * box_size_z_;
-            rVec_z += (rVec_z < -half_box_size_z_) * box_size_z_;
-
-            double length_sqr = rVec_x*rVec_x + rVec_y*rVec_y + rVec_z*rVec_z;
-            if ((length_sqr < cutoff_sqr_) && (j != index)) {
-              neighbors[count++] = j;
-            }
-          }
-        }
-      }
-    }
-    else
-    for (int dx = -1; dx <= 1; ++dx) {
-      for (int dy = -1; dy <= 1; ++dy) {
-        for (int dz = -1; dz <= 1; ++dz) {
-          //Если не ПГУ то не смотрим отраженные ячейки
-          int inside =
-            ((unsigned)(cx + dx) < (unsigned)num_cells_x_) &
-            ((unsigned)(cy + dy) < (unsigned)num_cells_y_) &
-            ((unsigned)(cz + dz) < (unsigned)num_cells_z_);
-          if (!inside) continue;
-
-          nx = (cx + dx + num_cells_x_) % num_cells_x_;
-          ny = (cy + dy + num_cells_y_) % num_cells_y_;
-          nz = (cz + dz + num_cells_z_) % num_cells_z_;
-          nId = nx + ny * num_cells_x_ + nz * num_cells_xy_;
-
-          // NEW with distance check aka Verlet List
-          start = cell_offsets_[nId], end = cell_offsets_[nId + 1];
-
-          //#pragma omp parallel for
-          for (size_t k = start; k < end; ++k) {
-            j = flat_cells_[k];
-
-            rVec_x = xn[j] - xi;
-            rVec_y = yn[j] - yi;
-            rVec_z = zn[j] - zi;
-
-            double length_sqr = rVec_x*rVec_x + rVec_y*rVec_y + rVec_z*rVec_z;
-
-            if ((length_sqr < cutoff_sqr_) && (j != index)) {
-              neighbors[count] = j;
-              count++;
-            }
-          }
-        }
-      }
-    };
-    return count;
-    */
   }
 
-  void buildAllNeighbors(std::vector<std::vector<int>> &neighbors,
-                         const Particles &particles, bool pbc) {
-    neighbors.assign(particles.size(), {}); // очистка
+  int getNeighborsUniq(std::vector<int> &neighbors, Particles &particles,
+                       const int index, bool pbc) const {
+    neighbors.clear();
+    int count = 0;
+    double xi = particles.coord_x_[index];
+    double yi = particles.coord_y_[index];
+    double zi = particles.coord_z_[index];
 
-    const double *__restrict__ xn = particles.coord_x_.data();
-    const double *__restrict__ yn = particles.coord_y_.data();
-    const double *__restrict__ zn = particles.coord_z_.data();
+    double *__restrict__ xn = particles.coord_x_.data();
+    double *__restrict__ yn = particles.coord_y_.data();
+    double *__restrict__ zn = particles.coord_z_.data();
 
-#pragma omp parallel for schedule(dynamic)
-    for (int cell = 0; cell < totalCells_; ++cell) {
-      int cz = cell / num_cells_xy_;
-      int cy = (cell - cz * num_cells_xy_) / num_cells_x_;
-      int cx = cell - cy * num_cells_x_ - cz * num_cells_xy_;
+    int cellIdx = getCellIndex(xi, yi, zi);
+    int cz = cellIdx / num_cells_xy_;
+    int cy = (cellIdx - cz * num_cells_xy_) / num_cells_x_;
+    int cx = cellIdx - cy * num_cells_x_ - cz * num_cells_xy_;
 
-      // Собираем список соседних ячеек (включая себя)
-      int neighbor_cells[27];
-      int n_cells = 0;
-      for (int dx = -1; dx <= 1; ++dx)
-        for (int dy = -1; dy <= 1; ++dy)
-          for (int dz = -1; dz <= 1; ++dz) {
-            int nx = cx + dx, ny = cy + dy, nz = cz + dz;
-            if (pbc) {
-              nx = (nx + num_cells_x_) % num_cells_x_;
-              ny = (ny + num_cells_y_) % num_cells_y_;
-              nz = (nz + num_cells_z_) % num_cells_z_;
-            } else {
-              if (nx >= num_cells_x_ || nx < 0 || ny >= num_cells_y_ ||
-                  ny < 0 || nz >= num_cells_z_ || nz < 0)
-                continue;
-            }
-            neighbor_cells[n_cells++] =
-                nx + ny * num_cells_x_ + nz * num_cells_xy_;
-          }
-
-      // Все частицы текущей ячейки
-      int start_i = cell_offsets_[cell];
-      int end_i = cell_offsets_[cell + 1];
-
-      for (int ni = 0; ni < n_cells; ++ni) {
-        int nId = neighbor_cells[ni];
-        int start_j = cell_offsets_[nId];
-        int end_j = cell_offsets_[nId + 1];
-
-        for (int k = start_i; k < end_i; ++k) {
-          int i = flat_cells_[k];
-          double xi = xn[i], yi = yn[i], zi = zn[i];
-
-          for (int l = start_j; l < end_j; ++l) {
-            int j = flat_cells_[l];
-            if (j == i)
+    // Предварительно вычислим 27 соседних ячеек
+    int neighbor_cells[27];
+    int n_cells = 0;
+    for (int dx = -1; dx <= 1; ++dx)
+      for (int dy = -1; dy <= 1; ++dy)
+        for (int dz = -1; dz <= 1; ++dz) {
+          int nx = cx + dx, ny = cy + dy, nz = cz + dz;
+          if (pbc) {
+            nx = (nx + num_cells_x_) % num_cells_x_;
+            ny = (ny + num_cells_y_) % num_cells_y_;
+            nz = (nz + num_cells_z_) % num_cells_z_;
+          } else {
+            if (nx >= num_cells_x_ || nx < 0 || ny >= num_cells_y_ || ny < 0 ||
+                nz >= num_cells_z_ || nz < 0)
               continue;
-
-            double dx = xn[j] - xi;
-            double dy = yn[j] - yi;
-            double dz = zn[j] - zi;
-
-            if (pbc) {
-              dx -= std::round(dx / box_size_x_) * box_size_x_;
-              dy -= std::round(dy / box_size_y_) * box_size_y_;
-              dz -= std::round(dz / box_size_z_) * box_size_z_;
-            }
-
-            double r2 = dx * dx + dy * dy + dz * dz;
-            if (r2 < cutoff_sqr_) {
-              neighbors[i].push_back(j);
-            }
           }
+          neighbor_cells[n_cells] = nx + ny * num_cells_x_ + nz * num_cells_xy_;
+          n_cells++;
+        }
+    for (int ni = 0; ni < n_cells; ++ni) {
+      int nId = neighbor_cells[ni];
+      int start = cell_offsets_[nId], end = cell_offsets_[nId + 1];
+
+      for (int k = start; k < end; ++k) {
+        int j = flat_cells_[k];
+        if (j <= index)
+          continue;
+
+        double dx = xn[j] - xi, dy = yn[j] - yi, dz = zn[j] - zi;
+
+        if (pbc) {
+          dx -= std::round(dx / box_size_x_) * box_size_x_;
+          dy -= std::round(dy / box_size_y_) * box_size_y_;
+          dz -= std::round(dz / box_size_z_) * box_size_z_;
+        }
+
+        double r2 = dx * dx + dy * dy + dz * dz;
+        if (r2 < cutoff_sqr_) {
+          neighbors.push_back(j);
+          count++;
         }
       }
     }
-  }
 
-  void buildAllNeighborsFlat(std::vector<int> &neighbors_flat_index,
-                             std::vector<double> &neighbors_flat_distance,
-                             std::vector<int> &neighbors_offset,
-                             const Particles &particles, bool pbc) {
-    const int N = particles.size();
-    neighbors_offset.assign(N + 1, 0);
-
-    const double *__restrict__ xn = particles.coord_x_.data();
-    const double *__restrict__ yn = particles.coord_y_.data();
-    const double *__restrict__ zn = particles.coord_z_.data();
-
-    std::vector<int> local_counts(N, 0);
-
-// -------- 1-й проход: считаем количество соседей --------
-#pragma omp parallel
-    {
-      std::vector<int> private_counts(N, 0);
-
-      int cz, cy, cx, nx, ny, nz;
-      int neighbor_cells[27], n_cells;
-      int start_i, end_i, start_j, end_j;
-      int nId, i, j;
-      double xi, yi, zi, dx, dy, dz, r2;
-#pragma omp for schedule(dynamic)
-      for (int cell = 0; cell < totalCells_; ++cell) {
-        cz = cell / num_cells_xy_;
-        cy = (cell - cz * num_cells_xy_) / num_cells_x_;
-        cx = cell - cy * num_cells_x_ - cz * num_cells_xy_;
-
-        n_cells = 0;
-        for (int dx = -1; dx <= 1; ++dx)
-          for (int dy = -1; dy <= 1; ++dy)
-            for (int dz = -1; dz <= 1; ++dz) {
-              nx = cx + dx, ny = cy + dy, nz = cz + dz;
-              if (pbc) {
-                nx = (nx + num_cells_x_) % num_cells_x_;
-                ny = (ny + num_cells_y_) % num_cells_y_;
-                nz = (nz + num_cells_z_) % num_cells_z_;
-              } else {
-                if (nx >= num_cells_x_ || nx < 0 || ny >= num_cells_y_ ||
-                    ny < 0 || nz >= num_cells_z_ || nz < 0)
-                  continue;
-              }
-              neighbor_cells[n_cells++] =
-                  nx + ny * num_cells_x_ + nz * num_cells_xy_;
-            }
-
-        start_i = cell_offsets_[cell];
-        end_i = cell_offsets_[cell + 1];
-
-        for (int ni = 0; ni < n_cells; ++ni) {
-          nId = neighbor_cells[ni];
-          start_j = cell_offsets_[nId];
-          end_j = cell_offsets_[nId + 1];
-
-          for (int k = start_i; k < end_i; ++k) {
-            i = flat_cells_[k];
-            xi = xn[i], yi = yn[i], zi = zn[i];
-
-            for (int l = start_j; l < end_j; ++l) {
-              j = flat_cells_[l];
-              if (j == i)
-                continue;
-
-              dx = xn[j] - xi;
-              dy = yn[j] - yi;
-              dz = zn[j] - zi;
-
-              if (pbc) {
-                dx -= std::round(dx / box_size_x_) * box_size_x_;
-                dy -= std::round(dy / box_size_y_) * box_size_y_;
-                dz -= std::round(dz / box_size_z_) * box_size_z_;
-              }
-
-              r2 = dx * dx + dy * dy + dz * dz;
-              if (r2 < cutoff_sqr_) {
-                private_counts[i]++;
-              }
-            }
-          }
-        }
-      }
-
-// Сливаем локальные счетчики
-#pragma omp critical
-      {
-        for (int i = 0; i < N; ++i)
-          local_counts[i] += private_counts[i];
-      }
-    }
-
-    // Префиксная сумма
-    for (int i = 0; i < N; ++i)
-      neighbors_offset[i + 1] = neighbors_offset[i] + local_counts[i];
-
-    neighbors_flat_index.resize(neighbors_offset[N]);
-    neighbors_flat_distance.resize(neighbors_offset[N]);
-
-// -------- 2-й проход: заполняем массив соседей --------
-#pragma omp parallel
-    {
-      std::vector<int> write_pos = neighbors_offset; // локальная копия
-
-      int cz, cy, cx, nx, ny, nz;
-      int neighbor_cells[27], n_cells;
-      int start_i, end_i, start_j, end_j, pos;
-      int nId, i, j;
-      double xi, yi, zi, dx, dy, dz, r2, r;
-#pragma omp for schedule(dynamic)
-      for (int cell = 0; cell < totalCells_; ++cell) {
-        cz = cell / num_cells_xy_;
-        cy = (cell - cz * num_cells_xy_) / num_cells_x_;
-        cx = cell - cy * num_cells_x_ - cz * num_cells_xy_;
-
-        n_cells = 0;
-        for (int dx = -1; dx <= 1; ++dx)
-          for (int dy = -1; dy <= 1; ++dy)
-            for (int dz = -1; dz <= 1; ++dz) {
-              nx = cx + dx, ny = cy + dy, nz = cz + dz;
-              if (pbc) {
-                nx = (nx + num_cells_x_) % num_cells_x_;
-                ny = (ny + num_cells_y_) % num_cells_y_;
-                nz = (nz + num_cells_z_) % num_cells_z_;
-              } else {
-                if (nx >= num_cells_x_ || nx < 0 || ny >= num_cells_y_ ||
-                    ny < 0 || nz >= num_cells_z_ || nz < 0)
-                  continue;
-              }
-              neighbor_cells[n_cells++] =
-                  nx + ny * num_cells_x_ + nz * num_cells_xy_;
-            }
-
-        start_i = cell_offsets_[cell];
-        end_i = cell_offsets_[cell + 1];
-
-        for (int ni = 0; ni < n_cells; ++ni) {
-          nId = neighbor_cells[ni];
-          start_j = cell_offsets_[nId];
-          end_j = cell_offsets_[nId + 1];
-
-          for (int k = start_i; k < end_i; ++k) {
-            i = flat_cells_[k];
-            xi = xn[i], yi = yn[i], zi = zn[i];
-
-            for (int l = start_j; l < end_j; ++l) {
-              j = flat_cells_[l];
-              if (j == i)
-                continue;
-
-              dx = xn[j] - xi;
-              dy = yn[j] - yi;
-              dz = zn[j] - zi;
-
-              if (pbc) {
-                dx -= std::round(dx / box_size_x_) * box_size_x_;
-                dy -= std::round(dy / box_size_y_) * box_size_y_;
-                dz -= std::round(dz / box_size_z_) * box_size_z_;
-              }
-
-              r2 = dx * dx + dy * dy + dz * dz;
-              if (r2 < cutoff_sqr_) {
-                pos = write_pos[i]++;
-                r = std::sqrt(r2);
-                neighbors_flat_index[pos] = j;
-                neighbors_flat_distance[pos] = r;
-              }
-            }
-          }
-        }
-      }
-    }
+    return count;
   }
 
   inline const std::string getData() const {
@@ -492,6 +231,17 @@ public:
   }
 
   inline int getNumCells() const { return totalCells_; };
+
+  inline int getCellIndex(const double &pos_x, const double &pos_y,
+                          const double &pos_z) const {
+    int ix =
+        std::min(static_cast<int>(pos_x * inv_cell_size_x_), num_cells_x_ - 1);
+    int iy =
+        std::min(static_cast<int>(pos_y * inv_cell_size_y_), num_cells_y_ - 1);
+    int iz =
+        std::min(static_cast<int>(pos_z * inv_cell_size_z_), num_cells_z_ - 1);
+    return ix + iy * num_cells_x_ + iz * num_cells_xy_;
+  }
 
 private:
   double cutoff_{0.0};
@@ -512,15 +262,6 @@ private:
   std::vector<size_t> cell_offsets_; // размер или offset начала
   std::vector<size_t>
       cell_counts_; // сколько в каждой ячейке (временно во время распределения)
-
-  int getCellIndex(const double &pos_x, const double &pos_y,
-                   const double &pos_z) const {
-    int ix = std::min(int(pos_x * inv_cell_size_x_), num_cells_x_ - 1);
-    int iy = std::min(int(pos_y * inv_cell_size_y_), num_cells_y_ - 1);
-    int iz = std::min(int(pos_z * inv_cell_size_z_), num_cells_z_ - 1);
-
-    return ix + iy * num_cells_x_ + iz * num_cells_xy_;
-  }
 
   CellList(const CellList &) = delete;
   CellList &operator=(const CellList &) = delete;

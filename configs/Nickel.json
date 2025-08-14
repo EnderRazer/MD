@@ -11,7 +11,7 @@
     "type": "BRNDSN"
   },
   "dimensions": {
-    "crist_length": 0.351913728,
+    "crist_length": 0.35314,
     "crist_num": [48, 48, 48],
     "void_num": [12, 12, 12]
   },
@@ -56,7 +56,7 @@
     "nsteps": 0,
     "pbc": false,
     "profiling": false,
-    "start_temp": 2.7315,
+    "start_temp": 0.0,
     "threads": 8
   },
   "material": {

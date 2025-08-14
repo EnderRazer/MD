@@ -111,47 +111,53 @@ public:
     int pbc = settings_.hasPbc();
 
     double lx = dim.sizeX(), ly = dim.sizeY(), lz = dim.sizeZ();
+    double inv_lx = 1 / dim.sizeX(), inv_ly = 1 / dim.sizeY(),
+           inv_lz = 1 / dim.sizeZ();
     double half_lx = dim.halfSizeX(), half_ly = dim.halfSizeY(),
            half_lz = dim.halfSizeZ();
 
-    double *__restrict__ x_ = particles.coord_x_.data();
-    double *__restrict__ y_ = particles.coord_y_.data();
-    double *__restrict__ z_ = particles.coord_z_.data();
+    alignas(64) double *__restrict__ x_ = particles.coord_x_.data();
+    alignas(64) double *__restrict__ y_ = particles.coord_y_.data();
+    alignas(64) double *__restrict__ z_ = particles.coord_z_.data();
 
-    double *__restrict__ fx_ = particles.force_x_.data();
-    double *__restrict__ fy_ = particles.force_y_.data();
-    double *__restrict__ fz_ = particles.force_z_.data();
+    alignas(64) double *__restrict__ fx_ = particles.force_x_.data();
+    alignas(64) double *__restrict__ fy_ = particles.force_y_.data();
+    alignas(64) double *__restrict__ fz_ = particles.force_z_.data();
 
-    double *__restrict__ vxx_ = particles.virial_xx_.data();
-    double *__restrict__ vxy_ = particles.virial_xy_.data();
-    double *__restrict__ vxz_ = particles.virial_xz_.data();
+    alignas(64) double *__restrict__ vxx_ = particles.virial_xx_.data();
+    alignas(64) double *__restrict__ vxy_ = particles.virial_xy_.data();
+    alignas(64) double *__restrict__ vxz_ = particles.virial_xz_.data();
 
-    double *__restrict__ vyx_ = particles.virial_yx_.data();
-    double *__restrict__ vyy_ = particles.virial_yy_.data();
-    double *__restrict__ vyz_ = particles.virial_yz_.data();
+    alignas(64) double *__restrict__ vyx_ = particles.virial_yx_.data();
+    alignas(64) double *__restrict__ vyy_ = particles.virial_yy_.data();
+    alignas(64) double *__restrict__ vyz_ = particles.virial_yz_.data();
 
-    double *__restrict__ vzx_ = particles.virial_zx_.data();
-    double *__restrict__ vzy_ = particles.virial_zy_.data();
-    double *__restrict__ vzz_ = particles.virial_zz_.data();
+    alignas(64) double *__restrict__ vzx_ = particles.virial_zx_.data();
+    alignas(64) double *__restrict__ vzy_ = particles.virial_zy_.data();
+    alignas(64) double *__restrict__ vzz_ = particles.virial_zz_.data();
 
-    double *__restrict__ ed_ = particles.electron_density_.data();
-    double *__restrict__ pp_ = particles.pair_potential_.data();
-    double *__restrict__ ce_ = particles.ce_.data();
-    double *__restrict__ d_ce_ = particles.d_ce_.data();
+    alignas(64) double *__restrict__ ed_ = particles.electron_density_.data();
+    alignas(64) double *__restrict__ pp_ = particles.pair_potential_.data();
+    alignas(64) double *__restrict__ ce_ = particles.ce_.data();
+    alignas(64) double *__restrict__ d_ce_ = particles.d_ce_.data();
 
-    double *__restrict__ epot_ = particles.e_pot_.data();
+    alignas(64) double *__restrict__ epot_ = particles.e_pot_.data();
+
+    for (int i = 0; i < pn; i++) {
+      fx_[i] = 0.0, fy_[i] = 0.0, fz_[i] = 0.0;
+
+      vxx_[i] = 0.0, vxy_[i] = 0.0, vxz_[i] = 0.0;
+      vyx_[i] = 0.0, vyy_[i] = 0.0, vyz_[i] = 0.0;
+      vzx_[i] = 0.0, vzy_[i] = 0.0, vzz_[i] = 0.0;
+
+      ed_[i] = 0.0, pp_[i] = 0.0, ce_[i] = 0.0, d_ce_[i] = 0.0;
+    }
 
     Timer timer{1};
-
-    // Создаем список ячеек
+    //  Создаем список ячеек
     timer.start();
-    std::vector<int> n_flat_index;
-    std::vector<double> n_flat_distance;
-    std::vector<int> n_offsets;
     cell_list_.rebuild(pot_.getRcut(), dim.sizeX(), dim.sizeY(), dim.sizeZ());
     cell_list_.distribute_particles(particles);
-    cell_list_.buildAllNeighborsFlat(n_flat_index, n_flat_distance, n_offsets,
-                                     particles, pbc);
     timer.stop();
     std::cout << "Cell list build elapsed time: " << timer.elapsed() << " ms"
               << std::endl;
@@ -160,26 +166,43 @@ public:
 // Предрасчеты для потенциала EAM
 #pragma omp parallel num_threads(tn)
     {
-      int ni, ns;
-      int start, end;
+      int ns;
+      int j;
 
       double dx, dy, dz;
-      double r2, r;
+      double ix, iy, iz;
+      double r2;
+      double r;
 
       double r_over_Re, t1, t2, t3, exp1, exp2, pow1, pow2;
-      double mu, rho_f;
 
-#pragma omp for schedule(dynamic)
+      std::vector<int> neighbour_i;
+
+      std::vector<double> rho_f(pn, 0);
+      std::vector<double> mu(pn, 0);
+
+#pragma omp for schedule(guided, 32)
       for (int i = 0; i < pn; i++) {
-        mu = 0.0, rho_f = 0.0;
+        ix = x_[i], iy = y_[i], iz = z_[i];
 
-        start = n_offsets[i];
-        end = n_offsets[i + 1];
-        ns = end - start;
+        ns = cell_list_.getNeighborsUniq(neighbour_i, particles, i, pbc);
 
-        // #pragma omp simd aligned(x_, y_, z_ : 64) reduction(+ : mu, rho_f)
-        for (int j = start; j < end; j++) {
-          r = n_flat_distance[j];
+        for (int ni = 0; ni < ns; ni++) {
+          j = neighbour_i[ni];
+          // Векторное расстояние
+          dx = ix - x_[j];
+          dy = iy - y_[j];
+          dz = iz - z_[j];
+          // Отражение частицы
+          if (pbc) {
+            dx -= std::round(dx * inv_lx) * lx;
+            dy -= std::round(dy * inv_ly) * ly;
+            dz -= std::round(dz * inv_lz) * lz;
+          }
+          // Расстояние между частицами
+          r2 = dx * dx + dy * dy + dz * dz;
+          r = sqrt(r2);
+
           // Расчеты ЕАМ
           r_over_Re = r * pot_.inv_r_e_;
           t1 = r_over_Re - 1;
@@ -189,14 +212,26 @@ public:
           exp1 = exp(-pot_.alpha_ * t1);
           exp2 = exp(-pot_.beta_ * t1);
 
-          pow1 = std::pow(t2, pot_.m_);
-          pow2 = std::pow(t3, pot_.n_);
+          pow1 = pow(t2, pot_.m_);
+          pow2 = pow(t3, pot_.n_);
 
-          rho_f += (pot_.f_e_ * exp2) / (1 + pow2);
-          mu += (pot_.a_ * exp1 / (1 + pow1)) - (pot_.b_ * exp2 / (1 + pow2));
+          double term1 = (pot_.f_e_ * exp2) / (1 + pow2);
+          double term2 =
+              (pot_.a_ * exp1 / (1 + pow1)) - (pot_.b_ * exp2 / (1 + pow2));
+
+          rho_f[i] += term1;
+          mu[i] += term2;
+
+          rho_f[j] += term1;
+          mu[j] += term2;
         }
-        ed_[i] = rho_f;
-        pp_[i] = mu;
+      }
+#pragma omp critical
+      {
+        for (int i = 0; i < pn; i++) {
+          ed_[i] += rho_f[i];
+          pp_[i] += mu[i];
+        }
       }
     }
     timer.stop();
@@ -204,14 +239,14 @@ public:
               << std::endl;
 
     timer.start();
-    // #pragma omp parallel num_threads(tn)
+#pragma omp parallel num_threads(tn)
     {
       double om_val, dom_val;
 
       double rho_over_RHO_n, rho_pow1, rho_pow2, rho_pow3;
       double rho_over_RHO_s, pow_term, log_term, pow_term_eta_minus1;
       double rho_over_RHO_e;
-      // #pragma omp for schedule(dynamic)
+#pragma omp for schedule(static)
       for (int i = 0; i < pn; i++) {
         om_val = 0.0;
         dom_val = 0.0;
@@ -240,8 +275,8 @@ public:
           rho_over_RHO_s = ed_[i] / pot_.rho_s_;
 
           // pow и log
-          pow_term = std::pow(rho_over_RHO_s, pot_.eta_);
-          log_term = std::log(pow_term); // = eta_ * log(rho/rho_s)
+          pow_term = pow(rho_over_RHO_s, pot_.eta_);
+          log_term = log(pow_term); // = eta_ * log(rho/rho_s)
 
           // om3
           om_val = pot_.om_e_ * (1.0 - log_term) * pow_term;
@@ -283,18 +318,19 @@ public:
     timer.start();
 #pragma omp parallel num_threads(tn)
     {
-      int ns, ni, start, end;
+      int ns;
+      int j;
 
       double ix, iy, iz;
       double idom, jdom;
       double dx, dy, dz;
       double r2;
-      double r, inv_r;
+      double r;
 
-      double fx, fy, fz;
-      double vxx, vxy, vxz;
-      double vyx, vyy, vyz;
-      double vzx, vzy, vzz;
+      std::vector<double> fx(pn, 0), fy(pn, 0), fz(pn, 0);
+      std::vector<double> vxx(pn, 0), vxy(pn, 0), vxz(pn, 0);
+      std::vector<double> vyx(pn, 0), vyy(pn, 0), vyz(pn, 0);
+      std::vector<double> vzx(pn, 0), vzy(pn, 0), vzz(pn, 0);
 
       double FU, Fx, Fy, Fz;
 
@@ -306,46 +342,34 @@ public:
       double var1_rho, var2_rho;
       double d_mu, d_rho_f;
 
-#pragma omp for schedule(dynamic)
+      std::vector<int> neighbour_i;
+
+#pragma omp for schedule(guided, 32)
       for (int i = 0; i < pn; i++) {
-        // Обнуление сил и вириалов
-        fx = 0.0, fy = 0.0, fz = 0.0;
-        vxx = 0.0, vxy = 0.0, vxz = 0.0;
-        vyx = 0.0, vyy = 0.0, vyz = 0.0;
-        vzx = 0.0, vzy = 0.0, vzz = 0.0;
+        ix = x_[i], iy = y_[i], iz = z_[i];
+        idom = d_ce_[i];
 
-        ix = x_[i], iy = y_[i], iz = z_[i], idom = d_ce_[i];
+        ns = cell_list_.getNeighborsUniq(neighbour_i, particles, i, pbc);
 
-        start = n_offsets[i];
-        end = n_offsets[i + 1];
-        ns = end - start;
-
-        //#pragma omp simd reduction(+ : fx, fy, fz, vxx, vxy, vxz, vyx, vyy, vyz, vzx,  \
-                               vzy, vzz)
-        for (int j = start; j < end; j++) {
-          ni = n_flat_index[j];
-          jdom = d_ce_[ni];
+        for (int ni = 0; ni < ns; ni++) {
+          j = neighbour_i[ni];
+          jdom = d_ce_[j];
           // Векторное расстояние
-          dx = ix - x_[ni];
-          dy = iy - y_[ni];
-          dz = iz - z_[ni];
+          dx = ix - x_[j];
+          dy = iy - y_[j];
+          dz = iz - z_[j];
           // Отражение частицы
-          dx -= pbc * (dx > half_lx) * lx;
-          dx += pbc * (dx < -half_lx) * lx;
-
-          dy -= pbc * (dy > half_ly) * ly;
-          dy += pbc * (dy < -half_ly) * ly;
-
-          dz -= pbc * (dz > half_lz) * lz;
-          dz += pbc * (dz < -half_lz) * lz;
+          if (pbc) {
+            dx -= std::round(dx * inv_lx) * lx;
+            dy -= std::round(dy * inv_ly) * ly;
+            dz -= std::round(dz * inv_lz) * lz;
+          }
 
           // Расстояние между частицами
-          // r2 = dx*dx + dy*dy + dz*dz;
-          // r  = sqrt(r2);
-          r = n_flat_distance[j];
-          inv_r = 1 / r;
-          // Сила потенциала
+          r2 = dx * dx + dy * dy + dz * dz;
+          r = sqrt(r2);
 
+          // Сила потенциала
           r_over_Re = r * pot_.inv_r_e_;
           t1 = r_over_Re - 1.0;
           t2 = r_over_Re - pot_.k_;
@@ -356,16 +380,17 @@ public:
           exp2 = exp(-pot_.beta_ * t1);
 
           // Общие степени
-          pow1 = std::pow(t2, pot_.m_); // (r/Re - k)^m
+          pow1m1 = pow(t2, pot_.m_ - 1); // (r/Re - k)^(m-1)
+          pow1 = pow1m1 * t2;            // (r/Re - k)^m
           plus_pow1 = (1.0 + pow1);
           inv_plus_pow1 = 1.0 / plus_pow1;
           inv_plus_pow1_sqr = inv_plus_pow1 * inv_plus_pow1;
-          pow1m1 = std::pow(t2, pot_.m_ - 1); // (r/Re - k)^(m-1)
-          pow2 = std::pow(t3, pot_.n_);       // (r/Re - λ)^n
+
+          pow2m1 = pow(t3, pot_.n_ - 1); // (r/Re - λ)^(n-1)
+          pow2 = pow2m1 * t3;            // (r/Re - λ)^n
           plus_pow2 = (1.0 + pow2);
           inv_plus_pow2 = 1.0 / plus_pow2;
           inv_plus_pow2_sqr = inv_plus_pow2 * inv_plus_pow2;
-          pow2m1 = std::pow(t3, pot_.n_ - 1); // (r/Re - λ)^(n-1)
 
           // ------------------- d_mu -------------------
           var11 = (-pot_.a_ * pot_.alpha_ * pot_.inv_r_e_) * exp1 * plus_pow1;
@@ -379,17 +404,137 @@ public:
           // ------------------- d_rho_f -------------------
           var1_rho = (-pot_.beta_ * pot_.inv_r_e_) * exp2 * plus_pow2;
           var2_rho = (pot_.n_ * pot_.inv_r_e_) * pow2m1 * exp2;
-          // var3_rho = 1.0 + pow2;
 
           d_mu = var1 + var2;
           d_rho_f = pot_.f_e_ * (var1_rho - var2_rho) * inv_plus_pow2_sqr;
 
           FU = -pot_.energy_unit_ * (((idom + jdom) * d_rho_f) + d_mu);
 
-          Fx = dx * FU * inv_r;
-          Fy = dy * FU * inv_r;
-          Fz = dz * FU * inv_r;
+          Fx = dx * FU / r;
+          Fy = dy * FU / r;
+          Fz = dz * FU / r;
 
+          fx[i] += Fx, fx[j] += -Fx;
+          fy[i] += Fy, fy[j] += -Fy;
+          fz[i] += Fz, fz[j] += -Fz;
+
+          vxx[i] += dx * Fx, vxx[j] += dx * Fx;
+          vxy[i] += dx * Fy, vxy[j] += dx * Fy;
+          vxz[i] += dx * Fz, vxz[j] += dx * Fz;
+
+          vyx[i] += dy * Fx, vyx[j] += dy * Fx;
+          vyy[i] += dy * Fy, vyy[j] += dy * Fy;
+          vyz[i] += dy * Fz, vyz[j] += dy * Fz;
+
+          vzx[i] += dz * Fx, vzx[j] += dz * Fx;
+          vzy[i] += dz * Fy, vzy[j] += dz * Fy;
+          vzz[i] += dz * Fz, vzz[j] += dz * Fz;
+        }
+      }
+#pragma critical
+      {
+        for (int i = 0; i < pn; i++) {
+          fx_[i] += fx[i], fy_[i] += fy[i], fz_[i] += fz[i];
+          vxx_[i] += vxx[i], vxy_[i] += vxy[i], vxz_[i] += vxz[i];
+          vyx_[i] += vyx[i], vyy_[i] += vyy[i], vyz_[i] += vyz[i];
+          vzx_[i] += vzx[i], vzy_[i] += vzy[i], vzz_[i] += vzz[i];
+        }
+      }
+    }
+    timer.stop();
+    std::cout << "Main EAM time elapsed " << timer.elapsed() << " ms"
+              << std::endl;
+  }
+
+  void CalculateLJ(System &sys_, EAM &pot_) {
+    Dimensions &dim = sys_.dimensions();
+    Particles &particles = sys_.particles();
+    const int pn = particles.size();
+
+    int tn = settings_.threads();
+    int pbc = settings_.hasPbc();
+
+    double lx = dim.sizeX(), ly = dim.sizeY(), lz = dim.sizeZ();
+    double inv_lx = 1 / dim.sizeX(), inv_ly = 1 / dim.sizeY(),
+           inv_lz = 1 / dim.sizeZ();
+    double half_lx = dim.halfSizeX(), half_ly = dim.halfSizeY(),
+           half_lz = dim.halfSizeZ();
+
+    alignas(64) double *__restrict__ x_ = particles.coord_x_.data();
+    alignas(64) double *__restrict__ y_ = particles.coord_y_.data();
+    alignas(64) double *__restrict__ z_ = particles.coord_z_.data();
+
+    alignas(64) double *__restrict__ fx_ = particles.force_x_.data();
+    alignas(64) double *__restrict__ fy_ = particles.force_y_.data();
+    alignas(64) double *__restrict__ fz_ = particles.force_z_.data();
+
+    alignas(64) double *__restrict__ vxx_ = particles.virial_xx_.data();
+    alignas(64) double *__restrict__ vxy_ = particles.virial_xy_.data();
+    alignas(64) double *__restrict__ vxz_ = particles.virial_xz_.data();
+
+    alignas(64) double *__restrict__ vyx_ = particles.virial_yx_.data();
+    alignas(64) double *__restrict__ vyy_ = particles.virial_yy_.data();
+    alignas(64) double *__restrict__ vyz_ = particles.virial_yz_.data();
+
+    alignas(64) double *__restrict__ vzx_ = particles.virial_zx_.data();
+    alignas(64) double *__restrict__ vzy_ = particles.virial_zy_.data();
+    alignas(64) double *__restrict__ vzz_ = particles.virial_zz_.data();
+
+    alignas(64) double *__restrict__ ed_ = particles.electron_density_.data();
+    alignas(64) double *__restrict__ pp_ = particles.pair_potential_.data();
+    alignas(64) double *__restrict__ ce_ = particles.ce_.data();
+    alignas(64) double *__restrict__ d_ce_ = particles.d_ce_.data();
+
+    alignas(64) double *__restrict__ epot_ = particles.e_pot_.data();
+
+    // Основной блок расчетов
+#pragma omp parallel num_threads(tn)
+    {
+      std::vector<int> neighbors;
+      neighbors.resize(cell_list_.maxParticlesInCell());
+
+      double e_pot;
+      double fx, fy, fz;
+      double vxx, vxy, vxz;
+      double vyx, vyy, vyz;
+      double vzx, vzy, vzz;
+#pragma omp for schedule(dynamic)
+      for (int i = 0; i < pn; i++) {
+        // Обнуление сил и вириалов
+        e_pot = 0.0;
+        fx = fy = fz = 0.0;
+        vxx = vxy = vxz = vyx = vyy = vyz = vzx = vzy = vzz = 0.0;
+
+        int ns = cell_list_.getNeighbors(neighbors, particles, i,
+                                         settings_.hasPbc());
+        std::cout << "Neighbors count for particle " << i << " : "
+                  << neighbors.size() << std::endl;
+#pragma omp simd reduction(+ : e_pot, fx, fy, fz, vxx, vxy, vxz, vyx, vyy,     \
+                               vyz, vzx, vzy, vzz)
+        for (int j = 0; j < ns; j++) {
+          int ni = neighbors[j];
+
+          double dx = x_[i] - x_[ni];
+          double dy = y_[i] - y_[ni];
+          double dz = z_[i] - z_[ni];
+
+          // Отражение частицы
+          dx -= pbc * lx * std::nearbyint(dx * inv_lx);
+          dy -= pbc * ly * std::nearbyint(dy * inv_ly);
+          dz -= pbc * lz * std::nearbyint(dz * inv_lz);
+
+          double r2 = dx * dx + dy * dy + dz * dz;
+          double r = std::sqrt(r2);
+          PotentialResult res = pot_.getAll(r);
+
+          double U = res.u / 2;
+          double FU = res.fu;
+
+          double Fx = dx * FU / r;
+          double Fy = dy * FU / r;
+          double Fz = dz * FU / r;
+
+          e_pot += U;
           fx += Fx;
           fy += Fy;
           fz += Fz;
@@ -403,6 +548,8 @@ public:
           vzy += dz * Fy;
           vzz += dz * Fz;
         }
+
+        epot_[i] = e_pot;
         fx_[i] = fx;
         fy_[i] = fy;
         fz_[i] = fz;
@@ -417,77 +564,6 @@ public:
         vzz_[i] = vzz;
       }
     }
-    timer.stop();
-    std::cout << "Main EAM time elapsed " << timer.elapsed() << " ms"
-              << std::endl;
-
-    // Основной блок расчетов
-    /*
-    if (pot_.getPotentialType() == Potential::PotentialType::LJ) {
-      #pragma omp parallel num_threads(tn)
-      {
-        std::vector<int> neighbors;
-        neighbors.resize(cell_list_.maxNeighborsCount());
-
-        double e_pot;
-        double fx,fy,fz;
-        double vxx, vxy, vxz;
-        double vyx, vyy, vyz;
-        double vzx, vzy, vzz;
-        #pragma omp for schedule(dynamic)
-        for (int i = 0; i < pn; i++) {
-          //Обнуление сил и вириалов
-          e_pot = 0.0;
-          fx = fy = fz = 0.0;
-          vxx = vxy = vxz = vyx = vyy = vyz = vzx = vzy = vzz = 0.0;
-
-          int ns = cell_list_.getNeighbors(neighbors, particles, i,
-    settings_.hasPbc());
-          //std::cout << "Neighbors count for particle "<<i<<" :
-    "<<neighbors.size() << std::endl;
-          //#pragma omp simd reduction(+:e_pot, fx, fy, fz, vxx, vxy, vxz, vyx,
-    vyy, vyz, vzx, vzy, vzz) for (int j = 0; j < ns;j++) { int ni =
-    neighbors[j];
-
-            double dx = x_[i] - x_[ni];
-            double dy = y_[i] - y_[ni];
-            double dz = z_[i] - z_[ni];
-
-            // Отражение частицы
-            dx -= pbc * lx * std::nearbyint(dx * inv_lx);
-            dy -= pbc * ly * std::nearbyint(dy * inv_ly);
-            dz -= pbc * lz * std::nearbyint(dz * inv_lz);
-
-            double r2 = dx*dx + dy*dy + dz*dz;
-            double r = std::sqrt(r2);
-            PotentialResult res = pot_.getAll(r);
-            // U = potential_->getU(lengthSqr);
-            // FU = potential_->getFU(lengthSqr);
-            double U = res.u / 2;
-            double FU = res.fu;
-
-            double Fx = dx * FU / r;
-            double Fy = dy * FU / r;
-            double Fz = dz * FU / r;
-
-            e_pot += U;
-            fx += Fx;
-            fy += Fy;
-            fz += Fz;
-            vxx += dx * Fx; vxy += dx * Fy; vxz += dx * Fz;
-            vyx += dy * Fx; vyy += dy * Fy; vyz += dy * Fz;
-            vzx += dz * Fx; vzy += dz * Fy; vzz += dz * Fz;
-          }
-
-          epot_[i] = e_pot;
-          fx_[i] = fx; fy_[i] = fy; fz_[i] = fz;
-          vxx_[i] = vxx; vxy_[i] = vxy; vxz_[i] = vxz;
-          vyx_[i] = vyx; vyy_[i] = vyy; vyz_[i] = vyz;
-          vzx_[i] = vzx; vzy_[i] = vzy; vzz_[i] = vzz;
-        }
-      }
-    }
-    */
   }
 
   void initialStep(System &sys_) {
